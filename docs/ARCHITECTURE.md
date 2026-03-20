@@ -1,4 +1,4 @@
-# Architecture Decision Record — Entre Deux
+# Architecture — Entre Deux
 
 ## System Architecture
 
@@ -7,143 +7,146 @@
 │                   Frontend                       │
 │          React 19 + TypeScript + Tailwind        │
 │                 (Mobile-First)                   │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ Lab Photo │  │  Voice   │  │  Visit Brief  │  │
-│  │  Upload   │  │ Recorder │  │   Viewer      │  │
-│  └─────┬─────┘  └─────┬────┘  └──────┬────────┘  │
-└────────┼──────────────┼──────────────┼───────────┘
-         │              │              │
-         ▼              ▼              ▼
+└────────────────────┬────────────────────────────┘
+                     │ REST API
+                     ▼
 ┌─────────────────────────────────────────────────┐
-│                  FastAPI Backend                  │
+│                FastAPI Backend                    │
 │                                                  │
 │  ┌─────────────────────────────────────────────┐ │
-│  │                 API Layer                    │ │
-│  │  /lab-results/analyze                       │ │
-│  │  /journal/entry                             │ │
-│  │  /journal/timeline                          │ │
-│  │  /visit-brief/generate                      │ │
+│  │              API Layer (v1)                  │ │
+│  │  /patients                                  │ │
+│  │  /observations/analyze-image                │ │
+│  │  /questionnaire-responses                   │ │
+│  │  /compositions/visit-brief                  │ │
+│  │  /consents                                  │ │
+│  │  /audit-events                              │ │
 │  └──────────────────┬──────────────────────────┘ │
 │                     │                            │
 │  ┌──────────────────▼──────────────────────────┐ │
-│  │              Service Layer                   │ │
-│  │  LabResultService                           │ │
-│  │  JournalService                             │ │
-│  │  VisitBriefService                          │ │
+│  │         Middleware (Consent Check)           │ │
 │  └──────────────────┬──────────────────────────┘ │
 │                     │                            │
 │  ┌──────────────────▼──────────────────────────┐ │
-│  │              Agent Layer                     │ │
-│  │  ┌────────────┐ ┌──────────┐ ┌───────────┐  │ │
-│  │  │  OCR Agent │ │ Journal  │ │   Brief   │  │ │
-│  │  │(Mistral    │ │  Agent   │ │  Agent    │  │ │
-│  │  │ OCR 3)     │ │(Small 4) │ │(Small 4)  │  │ │
-│  │  └────────────┘ └──────────┘ └───────────┘  │ │
-│  │  ┌────────────┐                              │ │
-│  │  │ Voxtral    │                              │ │
-│  │  │ Transcribe │                              │ │
-│  │  └────────────┘                              │ │
-│  └─────────────────────────────────────────────┘ │
-└──────────────────────┬───────────────────────────┘
-                       │
-                       ▼
-              ┌────────────────┐
-              │   PostgreSQL   │
-              │   (Supabase)   │
-              └────────────────┘
+│  │             Service Layer                    │ │
+│  │  LabResultService, JournalService,          │ │
+│  │  VisitBriefService, ConsentService,         │ │
+│  │  AuditService                               │ │
+│  └──────────┬───────────────┬──────────────────┘ │
+│             │               │                    │
+│  ┌──────────▼─────┐  ┌─────▼──────────────────┐ │
+│  │  Agent Layer    │  │  Repository Layer       │ │
+│  │  OCR, Explain,  │  │  PatientRepo,          │ │
+│  │  Journal, Brief │  │  ObservationRepo,      │ │
+│  │  (Mistral AI)   │  │  ConsentRepo, etc.     │ │
+│  └──────────┬──────┘  └─────┬──────────────────┘ │
+│             │               │                    │
+└─────────────┼───────────────┼────────────────────┘
+              │               │
+              ▼               ▼
+     ┌──────────────┐  ┌──────────────┐
+     │  Mistral AI   │  │ PostgreSQL   │
+     │  Small 4      │  │ (FHIR JSONB) │
+     │  OCR 3        │  │              │
+     │  Voxtral      │  │              │
+     └──────────────┘  └──────────────┘
 ```
 
 ## Key Architecture Decisions
 
-### ADR-001: Separate Agent Layer for Mistral Calls
+### ADR-001: FHIR R5 as Data Model
 
-**Decision:** All Mistral API calls are isolated in an `agents/` directory, never called directly from routes or services.
+**Decision:** Store all clinical data as FHIR R5 resources in PostgreSQL JSONB columns.
 
-**Why:** Clean separation allows swapping models, adding fallbacks, and testing with mocks without touching business logic. Also mirrors the multi-agent pattern from StoryBridge (proven architecture).
+**Context:** Healthcare interoperability, CE marking requirements, and enterprise sales all require standard clinical data formats.
 
-### ADR-002: Mistral Small 4 as Primary Reasoning Model
+**Consequences:**
 
-**Decision:** Use Mistral Small 4 (released March 16, 2026) for all text reasoning tasks.
+- All data is portable and interoperable from day one
+- FHIR validation via `fhir.resources` library catches data quality issues early
+- Enterprise integrations (EHR, insurance systems) become straightforward
+- Slightly more complex than custom schemas, but pays dividends at scale
 
-**Why:**
+### ADR-002: Consent-First Architecture
 
-- Just released 4 days before the hackathon event page went live — using it signals technical currency
-- 119B params MoE with only 6B active — fast inference
-- Unified instruct + reasoning + coding in one model
-- Best-in-class French language capabilities
-- Open-weight (Apache 2.0) — deployable anywhere
+**Decision:** All AI-powered endpoints require active FHIR Consent before processing. Consent is verified via FastAPI middleware.
 
-### ADR-003: Voxtral for Voice Input (Not Web Speech API)
+**Context:** GDPR, French health data regulations (HDS), and enterprise buyers all require explicit consent management.
 
-**Decision:** Use Voxtral Transcribe for speech-to-text instead of browser Web Speech API.
+**Consequences:**
 
-**Why:**
+- Every AI endpoint checks consent before any processing
+- Consent is a first-class FHIR resource, not an afterthought
+- Consent can be revoked, immediately blocking further processing
+- Enterprise buyers see a compliant system from the first demo
 
-- Superior French language transcription accuracy
-- Consistent behavior across browsers/devices
-- Demonstrates use of Mistral's model ecosystem (hackathon bonus)
-- Supports speaker diarization for future multi-speaker scenarios
+### ADR-003: Audit Logging via FHIR AuditEvent
 
-### ADR-004: Mobile-First, Single-Page Application
+**Decision:** Every AI agent call is logged as a FHIR AuditEvent with agent name, model version, and patient reference.
 
-**Decision:** Build as a mobile-first SPA with React, not a native app or desktop-first design.
+**Context:** Regulatory requirements for AI in healthcare demand full traceability of all automated decisions.
 
-**Why:** Patients use this on their phones — in waiting rooms, at home, on the go. Touch targets (44px min), large text (16px min input), and thumb-friendly layout are non-negotiable.
+**Consequences:**
 
-### ADR-005: PostgreSQL with Simple Schema
+- Complete audit trail for every AI interaction
+- AuditEvents are queryable per patient
+- Enables compliance reporting and incident investigation
 
-**Decision:** Use PostgreSQL (via Supabase) with a simple, denormalized schema optimized for the hackathon timeline.
+### ADR-004: Direct PostgreSQL (asyncpg) over Supabase
 
-**Why:** 12 hours. No time for complex relational modeling. Store structured JSON in journal entries. Optimize for read speed on timeline queries.
+**Decision:** Use SQLAlchemy async with asyncpg directly instead of Supabase client.
 
-## Database Schema (MVP)
+**Context:** Production healthcare SaaS needs full control over database schema, migrations, and connection pooling. Alembic provides version-controlled migrations.
 
-```sql
-CREATE TABLE patients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    date_of_birth DATE,
-    conditions TEXT[],
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+**Consequences:**
 
-CREATE TABLE lab_results (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES patients(id),
-    original_image_url TEXT,
-    extracted_data JSONB NOT NULL,
-    explanation TEXT NOT NULL,
-    analyzed_at TIMESTAMPTZ DEFAULT NOW()
-);
+- Full control over schema evolution via Alembic migrations
+- No vendor lock-in to Supabase
+- Async support for high-concurrency workloads
+- Standard PostgreSQL deployment (Docker, Cloud SQL, RDS)
 
-CREATE TABLE journal_entries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES patients(id),
-    raw_transcript TEXT,
-    structured_data JSONB NOT NULL,
-    emotional_state TEXT,
-    ai_response TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+## Database Schema
 
-CREATE TABLE visit_briefs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES patients(id),
-    period_start TIMESTAMPTZ NOT NULL,
-    period_end TIMESTAMPTZ NOT NULL,
-    content JSONB NOT NULL,
-    generated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+7 tables, each storing a `fhir_resource JSONB` column alongside indexed metadata:
 
-## Mistral Model Usage
+| Table                     | Key Columns                        | Indexes                  |
+| ------------------------- | ---------------------------------- | ------------------------ |
+| `patients`                | identifier (unique)                | identifier               |
+| `observations`            | patient_id, loinc_code             | (patient_id, loinc_code) |
+| `diagnostic_reports`      | patient_id                         | patient_id               |
+| `questionnaire_responses` | patient_id                         | patient_id               |
+| `compositions`            | patient_id, composition_type       | patient_id               |
+| `consents`                | patient_id, scope, active          | (patient_id, scope)      |
+| `audit_events`            | patient_ref, agent_name, model_ver | patient_ref              |
 
-| Task                   | Model                              | Why                                                         |
-| ---------------------- | ---------------------------------- | ----------------------------------------------------------- |
-| Lab result OCR         | Mistral OCR 3                      | Purpose-built document extraction                           |
-| Lab result explanation | Mistral Small 4                    | French reasoning, plain-language generation                 |
-| Voice transcription    | Voxtral Transcribe                 | French speech recognition                                   |
-| Journal structuring    | Mistral Small 4                    | Extract symptoms, emotions, medications from natural speech |
-| Empathetic responses   | Mistral Small 4                    | Conversational, context-aware                               |
-| Visit brief generation | Mistral Small 4 + function calling | Aggregate data, structure into brief                        |
+## AI Agent Architecture
+
+All AI agents follow a consistent pattern: Mistral SDK async call → JSON response parsing → audit logging.
+
+| Agent                    | Model                                     | Input                        | Output                             | Temperature |
+| ------------------------ | ----------------------------------------- | ---------------------------- | ---------------------------------- | ----------- |
+| `OCRAgent`               | mistral-ocr-latest + mistral-small-latest | Base64 image                 | LOINC-coded lab values             | 0.0         |
+| `ExplanationAgent`       | mistral-small-latest                      | Observation list             | Plain-French explanation           | 0.3         |
+| `JournalAgent.structure` | mistral-small-latest                      | Patient transcript           | Symptoms, emotions, meds, severity | 0.1         |
+| `JournalAgent.response`  | mistral-small-latest                      | Transcript + structured data | Empathetic French response         | 0.5         |
+| `BriefAgent`             | mistral-small-latest                      | Observations + QRs           | Visit brief sections               | 0.3         |
+
+**Key design decisions:**
+
+- All agents use `response_format=json_object` for reliable parsing
+- OCR is a two-step pipeline: Mistral OCR (image → markdown) then Mistral Small (markdown → structured JSON)
+- Every agent call is audit-logged as a FHIR AuditEvent via `AuditService`
+- French-language system prompts tuned for patient comprehension
+
+## Technology Stack
+
+| Layer          | Technology                              |
+| -------------- | --------------------------------------- |
+| **AI Models**  | Mistral Small 4, Mistral OCR 3, Voxtral |
+| **Backend**    | Python 3.12, FastAPI, SQLAlchemy async  |
+| **Frontend**   | React 19, TypeScript, Tailwind CSS      |
+| **Database**   | PostgreSQL 16 (FHIR JSONB)              |
+| **Migrations** | Alembic                                 |
+| **FHIR**       | fhir.resources 8.x (R5)                 |
+| **Deployment** | Docker, Google Cloud Run                |
+| **Testing**    | pytest, vitest, Playwright              |

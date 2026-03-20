@@ -30,6 +30,13 @@ Thumbs.db
 coverage/
 htmlcov/
 .pytest_cache/
+.vitest/
 
 # Docker
 docker-compose.override.yml
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/

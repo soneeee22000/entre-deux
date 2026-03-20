@@ -2,11 +2,11 @@
 
 ## Product Vision
 
-Entre Deux is the AI companion for the space between doctor appointments, helping chronic condition patients understand their lab results, track their health journey through voice, and walk into every appointment prepared.
+Entre Deux is a FHIR-native AI companion for chronic condition patients, filling the gap between doctor appointments. Starting with diabetes, it helps patients understand their lab results, track their health journey through voice, and walk into every appointment prepared. Built for the French B2B2C healthcare market.
 
 ## Target User
 
-**Primary:** Patients with chronic conditions (diabetes, cardiovascular, autoimmune) who see specialists every 3-6 months and struggle with:
+**Primary:** Patients with chronic conditions (diabetes first, then cardiovascular, autoimmune) who see specialists every 3-6 months and struggle with:
 
 - Understanding lab results and medical documents
 - Remembering symptoms and changes to report
@@ -17,110 +17,78 @@ Entre Deux is the AI companion for the space between doctor appointments, helpin
 
 **Context:** France-based, French-speaking. Navigating the French healthcare system (parcours de soins, medecin traitant, ALD classifications).
 
-## Core Features (MVP — Hackathon Scope)
+## Core Features
 
-### Feature 1: Lab Result Analyzer
+### Feature 1: Lab Result Analyzer (FHIR Observations + DiagnosticReport)
 
-**User story:** As a patient, I want to photograph my lab results and get a plain-French explanation so I understand what the numbers mean without Googling.
+**User story:** As a patient, I want to photograph my lab results and get a plain-French explanation so I understand what the numbers mean.
 
 **Flow:**
 
 1. User uploads a photo of lab results (ordonnance, bilan sanguin)
-2. Mistral OCR 3 extracts structured data (test names, values, reference ranges)
-3. Mistral Small 4 generates a plain-French explanation with context
-4. If previous results exist, show trend comparison
-5. Flag any values outside reference range with simple explanation
+2. Mistral OCR 3 extracts structured data (LOINC-coded test names, values, reference ranges)
+3. Each value is stored as a FHIR Observation resource
+4. A FHIR DiagnosticReport wraps all Observations
+5. Mistral Small 4 generates a plain-French explanation with context
+6. All AI calls are audit-logged as FHIR AuditEvents
 
-**Acceptance criteria:**
+**API:** `POST /api/v1/observations/analyze-image`
 
-- Handles standard French lab result formats (bilan sanguin, bilan lipidique, HbA1c)
-- Explanation is in plain French (no medical jargon without definition)
-- Trend comparison when previous results are stored
-- Response time under 10 seconds
+### Feature 2: Voice Health Journal (FHIR QuestionnaireResponse)
 
-### Feature 2: Voice Health Journal
-
-**User story:** As a patient, I want to speak about how I'm feeling between appointments so my symptoms and experiences are captured without manual typing.
+**User story:** As a patient, I want to speak naturally about how I'm feeling and have it structured into a health timeline.
 
 **Flow:**
 
-1. User taps microphone and speaks naturally in French
-2. Voxtral Transcribe converts speech to text
-3. Mistral Small 4 structures the input: extracts symptoms, emotional state, medication mentions, severity
-4. AI responds with empathy and may ask a clarifying follow-up
-5. Entry is stored in chronological timeline
+1. User records a voice message or types text
+2. AI structures the entry: symptoms, emotional state, medications mentioned, severity
+3. Stored as a FHIR QuestionnaireResponse with structured items
+4. AI generates an empathetic response acknowledging the patient's experience
 
-**Acceptance criteria:**
+**API:** `POST /api/v1/questionnaire-responses`
 
-- French speech recognition via Voxtral
-- Structured extraction: symptoms, emotions, medications, dates
-- Empathetic response (not clinical/robotic)
-- Timeline view of all entries
-- Follow-up questions when input is vague
+### Feature 3: Visit Brief Generator (FHIR Composition)
 
-### Feature 3: Visit Brief Generator
-
-**User story:** As a patient, I want a summary of everything that happened since my last appointment so I can share it with my doctor and not forget anything.
+**User story:** As a patient, I want a one-page summary before my next appointment so I remember everything important.
 
 **Flow:**
 
-1. User taps "Generate Visit Brief" before their appointment
-2. AI aggregates: journal entries, lab results, trends, flagged symptoms
-3. Generates a structured one-page brief:
-   - Key changes since last visit
-   - Symptom timeline with frequency/severity
-   - Lab result trends
-   - 3-5 suggested questions for the doctor
-4. Brief can be shared (PDF or shown on phone)
+1. AI aggregates all Observations and QuestionnaireResponses
+2. Generates a structured brief with sections: key changes, symptom timeline, lab trends, suggested questions
+3. Stored as a FHIR Composition resource
 
-**Acceptance criteria:**
+**API:** `POST /api/v1/compositions/visit-brief`
 
-- Aggregates all data since a configurable "last visit" date
-- Structured, scannable format (not a wall of text)
-- Includes suggested questions based on symptoms/trends
-- Exportable or displayable on mobile
+### Feature 4: Consent Management (FHIR Consent)
 
-### Feature 4: Emotional Companion Layer
-
-**User story:** As a patient, I want to feel heard when I express frustration or exhaustion about my condition, not just get clinical responses.
+**User story:** As a patient, I want to control what data processing is performed on my health data.
 
 **Flow:**
 
-- Embedded in the journal feature
-- When user expresses emotional distress ("I'm tired of this," "I can't do this anymore"), AI responds with genuine empathy before structuring the clinical data
-- If distress signals are severe, gently suggests resources (3114 crisis line, speaking with their medecin traitant)
+1. Patient grants consent for specific scopes (e.g., "ai-processing")
+2. All AI-powered endpoints verify active consent before processing
+3. Patients can revoke consent at any time
 
-**Acceptance criteria:**
+**API:** `POST /api/v1/consents`, `PUT /api/v1/consents/{id}/revoke`
 
-- Detects emotional content in journal entries
-- Responds with empathy before clinical structuring
-- Never claims to be a therapist or offers medical advice
-- Provides resource suggestions for severe distress
+## Regulatory Compliance
+
+- All clinical data stored as FHIR R5 resources (JSONB in PostgreSQL)
+- Every AI agent call audit-logged as FHIR AuditEvent
+- Consent-first architecture: no AI processing without explicit patient consent
+- LOINC coding for all lab observations
+- Designed for CE marking pathway
+
+## Business Model
+
+- **B2B2C:** Sold to healthcare insurers (mutuelles), hospital groups, and diabetes care networks
+- **Diabetes-first:** Focused vertical with HbA1c, glucose, creatinine as initial LOINC codes
+- **Revenue:** Per-patient licensing to enterprise buyers
 
 ## Non-Functional Requirements
 
-- **Mobile-first:** Primary use case is on a phone
-- **Language:** French (primary), English (stretch)
-- **Performance:** OCR + explanation pipeline under 10 seconds
-- **Privacy:** No data shared with third parties. Patient data stays in their account
-- **Accessibility:** WCAG 2.1 AA compliance for core flows
-- **Regulatory positioning:** Organizational/comprehension tool — NOT a medical device, NOT diagnostic
-
-## Out of Scope (Post-Hackathon)
-
-- Integration with Mon Espace Sante or Doctolib APIs
-- Multi-patient support for caregivers
-- Medication interaction checking
-- Doctor-facing dashboard
-- Real-time appointment booking
-- Push notification system
-- Offline mode
-
-## Success Metrics (Hackathon)
-
-- Complete demo flow works end-to-end without crashes
-- Lab result explanation is accurate and plain-language
-- Voice journal captures and structures input correctly
-- Visit brief is coherent and useful
-- Judges relate to the problem personally
-- Pitch is under 3 minutes with clear impact statement
+- Mobile-first responsive design (patients use phones)
+- French-language UI and AI responses
+- Sub-3s response time for AI operations
+- GDPR-compliant data handling
+- Audit trail for all AI interactions
