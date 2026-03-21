@@ -40,7 +40,7 @@ async def safe_chat_complete(
         response = await asyncio.wait_for(
             client.chat.complete_async(
                 model=model,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
                 response_format=response_format,
                 temperature=temperature,
             ),

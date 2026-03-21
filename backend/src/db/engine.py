@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import (
+from sqlalchemy.ext.asyncio import (  # type: ignore[attr-defined]
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,

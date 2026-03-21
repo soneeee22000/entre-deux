@@ -33,8 +33,8 @@ class BaseRepository(Generic[T]):
         """List entities filtered by patient_id column."""
         stmt = (
             select(self._model)
-            .where(self._model.patient_id == patient_id)  # type: ignore[attr-defined]
-            .order_by(self._model.created_at.desc())  # type: ignore[attr-defined]
+            .where(self._model.patient_id == patient_id)
+            .order_by(self._model.created_at.desc())
             .limit(limit)
         )
         result = await self._session.execute(stmt)

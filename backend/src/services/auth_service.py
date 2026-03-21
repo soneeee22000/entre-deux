@@ -81,9 +81,9 @@ class AuthService:
             "exp": expire,
             "type": "access",
         }
-        return jwt.encode(
+        return str(jwt.encode(
             payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
-        )
+        ))
 
     def create_refresh_token(self, user_id: uuid.UUID) -> str:
         """Create a long-lived JWT refresh token."""
@@ -95,9 +95,9 @@ class AuthService:
             "exp": expire,
             "type": "refresh",
         }
-        return jwt.encode(
+        return str(jwt.encode(
             payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
-        )
+        ))
 
     def verify_access_token(self, token: str) -> uuid.UUID:
         """Decode an access token and return the user_id."""

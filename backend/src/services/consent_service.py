@@ -28,7 +28,7 @@ class ConsentService:
             fhir_resource=fhir_consent.model_dump(mode="json"),
         )
         created = await self._repo.create(row)
-        created.fhir_resource["id"] = str(created.id)  # type: ignore[index]
+        created.fhir_resource["id"] = str(created.id)
         flag_modified(created, "fhir_resource")
         await self._session.commit()
         return created
@@ -48,7 +48,7 @@ class ConsentService:
         if row is None:
             return None
         row.active = False
-        row.fhir_resource["status"] = "inactive"  # type: ignore[index]
+        row.fhir_resource["status"] = "inactive"
         flag_modified(row, "fhir_resource")
         await self._session.commit()
         await self._session.refresh(row)

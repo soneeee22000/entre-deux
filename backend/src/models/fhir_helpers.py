@@ -31,12 +31,12 @@ def create_patient(
     return Patient(
         id=str(uuid4()),
         identifier=[
-            {
+            {  # type: ignore[list-item]
                 "system": SYSTEM_ENTRE_DEUX,
                 "value": identifier,
             }
         ],
-        name=[{"given": [given_name], "family": family_name}],
+        name=[{"given": [given_name], "family": family_name}],  # type: ignore[list-item]
     )
 
 
@@ -83,7 +83,7 @@ def create_diagnostic_report(
     return DiagnosticReport(
         id=str(uuid4()),
         status="final",
-        code={
+        code={  # type: ignore[arg-type]
             "coding": [
                 {
                     "system": SYSTEM_LOINC,
@@ -92,9 +92,9 @@ def create_diagnostic_report(
                 }
             ]
         },
-        subject={"reference": patient_ref},
-        result=[{"reference": ref} for ref in observation_refs],
-        issued=datetime.now(tz=timezone.utc).isoformat(),
+        subject={"reference": patient_ref},  # type: ignore[arg-type]
+        result=[{"reference": ref} for ref in observation_refs],  # type: ignore[misc]
+        issued=datetime.now(tz=timezone.utc).isoformat(),  # type: ignore[arg-type]
     )
 
 
@@ -107,9 +107,9 @@ def create_questionnaire_response(
         id=str(uuid4()),
         questionnaire=f"{SYSTEM_ENTRE_DEUX}/Questionnaire/patient-journal",
         status="completed",
-        subject={"reference": patient_ref},
-        authored=datetime.now(tz=timezone.utc).isoformat(),
-        item=items,
+        subject={"reference": patient_ref},  # type: ignore[arg-type]
+        authored=datetime.now(tz=timezone.utc).isoformat(),  # type: ignore[arg-type]
+        item=items,  # type: ignore[arg-type]
     )
 
 
@@ -122,7 +122,7 @@ def create_composition_visit_brief(
     return Composition(
         id=str(uuid4()),
         status="final",
-        type={
+        type={  # type: ignore[arg-type]
             "coding": [
                 {
                     "system": SYSTEM_LOINC,
@@ -131,11 +131,11 @@ def create_composition_visit_brief(
                 }
             ]
         },
-        subject=[{"reference": patient_ref}],
-        author=[{"reference": author_ref}],
-        date=datetime.now(tz=timezone.utc).isoformat(),
+        subject=[{"reference": patient_ref}],  # type: ignore[list-item]
+        author=[{"reference": author_ref}],  # type: ignore[list-item]
+        date=datetime.now(tz=timezone.utc).isoformat(),  # type: ignore[arg-type]
         title="Visit Brief",
-        section=sections,
+        section=sections,  # type: ignore[arg-type]
     )
 
 
@@ -147,7 +147,7 @@ def create_consent(
         id=str(uuid4()),
         status="active",
         category=[
-            {
+            {  # type: ignore[list-item]
                 "coding": [
                     {
                         "system": SYSTEM_ENTRE_DEUX,
@@ -156,10 +156,10 @@ def create_consent(
                 ]
             }
         ],
-        subject={"reference": patient_ref},
-        date=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d"),
+        subject={"reference": patient_ref},  # type: ignore[arg-type]
+        date=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d"),  # type: ignore[arg-type]
         provision=[
-            {
+            {  # type: ignore[list-item]
                 "purpose": [
                     {
                         "system": SYSTEM_ENTRE_DEUX,
@@ -182,7 +182,7 @@ def create_audit_event(
         entity_list.append({"what": {"reference": patient_ref}})
     return AuditEvent(
         id=str(uuid4()),
-        code={
+        code={  # type: ignore[arg-type]
             "coding": [
                 {
                     "system": AUDIT_SYSTEM_DCM,
@@ -192,12 +192,12 @@ def create_audit_event(
             ]
         },
         agent=[
-            {
+            {  # type: ignore[list-item]
                 "who": {"display": agent_name},
                 "requestor": False,
             }
         ],
-        source={"observer": {"display": "entre-deux-api"}},
-        recorded=datetime.now(tz=timezone.utc).isoformat(),
-        entity=entity_list if entity_list else None,
+        source={"observer": {"display": "entre-deux-api"}},  # type: ignore[arg-type]
+        recorded=datetime.now(tz=timezone.utc).isoformat(),  # type: ignore[arg-type]
+        entity=entity_list if entity_list else None,  # type: ignore[arg-type]
     )
