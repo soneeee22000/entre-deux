@@ -228,21 +228,51 @@ function AiResponseCard({ response }: { response: FhirQuestionnaireResponse }) {
 }
 
 function JournalEntryCard({ entry }: { entry: FhirQuestionnaireResponse }) {
+  const [expanded, setExpanded] = useState(false);
   const transcript = getJournalTranscript(entry);
+  const aiResponse = getJournalAiResponse(entry);
+  const symptoms = getJournalSymptoms(entry);
   const emotionalState = getJournalEmotionalState(entry);
   const date = entry.authored ? formatDate(entry.authored) : "";
 
   return (
-    <Card>
+    <Card
+      className="cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
+    >
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm text-muted-foreground">{date}</span>
         {emotionalState && <Badge>{emotionalState}</Badge>}
       </div>
       <p className="text-base text-foreground">
-        {transcript.length > 120
+        {!expanded && transcript.length > 120
           ? `${transcript.slice(0, 120)}...`
           : transcript}
       </p>
+      {expanded && aiResponse && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <p className="text-sm text-foreground whitespace-pre-line mb-2">
+            {aiResponse}
+          </p>
+          {symptoms.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {symptoms.map((symptom) => (
+                <Badge key={symptom} variant="accent">
+                  {symptom}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
