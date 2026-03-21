@@ -13,6 +13,7 @@ from src.db.tables import (  # noqa: F401 — ensure tables are registered
     ObservationTable,
     PatientTable,
     QuestionnaireResponseTable,
+    UserTable,
 )
 
 config = context.config
