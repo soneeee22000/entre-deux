@@ -111,4 +111,18 @@ describe("DashboardPage", () => {
     renderDashboard();
     expect(screen.getByLabelText("Parametres")).toBeInTheDocument();
   });
+
+  it("shows error banner on API failure", async () => {
+    const mockApi = await import("@/lib/api");
+    vi.spyOn(mockApi.api, "getPatientTimeline").mockRejectedValue(
+      new Error("Network error"),
+    );
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText("Network error")).toBeInTheDocument();
+    });
+  });
 });

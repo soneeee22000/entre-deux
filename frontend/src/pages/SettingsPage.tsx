@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -6,42 +6,30 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePatient } from "@/lib/use-patient";
+import { useAsyncData } from "@/lib/use-async-data";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
-import { getPatientDisplayName, type FhirConsent } from "@/lib/fhir";
+import { getPatientDisplayName } from "@/lib/fhir";
 
 export function SettingsPage() {
   const { patient, patientId, logout } = usePatient();
   const navigate = useNavigate();
-  const [consents, setConsents] = useState<FhirConsent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!patientId) return;
-    let cancelled = false;
-    api
-      .listConsents(patientId)
-      .then((data) => {
-        if (!cancelled) setConsents(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const {
+    data: consents,
+    error: loadError,
+    isLoading,
+    retry,
+  } = useAsyncData(() => api.listConsents(patientId!), [patientId]);
 
   async function handleRevoke(consentId: string) {
     setRevokingId(consentId);
     try {
-      const updated = await api.revokeConsent(consentId);
-      setConsents((prev) =>
-        prev.map((consent) => (consent.id === consentId ? updated : consent)),
-      );
+      await api.revokeConsent(consentId);
+      retry();
     } catch {
       // Silently fail — consent may already be revoked
     } finally {
@@ -50,12 +38,16 @@ export function SettingsPage() {
   }
 
   function handleLogout() {
+    if (!window.confirm("Etes-vous sur de vouloir vous deconnecter ?")) {
+      return;
+    }
     logout();
     navigate("/bienvenue", { replace: true });
   }
 
   const displayName = patient ? getPatientDisplayName(patient) : "";
   const identifier = patient?.identifier?.[0]?.value ?? "";
+  const displayConsents = consents ?? [];
 
   return (
     <div>
@@ -82,15 +74,17 @@ export function SettingsPage() {
             Consentements
           </h3>
 
+          {loadError && <ErrorBanner message={loadError} onRetry={retry} />}
+
           {isLoading ? (
             <LoadingSpinner />
-          ) : consents.length === 0 ? (
+          ) : !loadError && displayConsents.length === 0 ? (
             <p className="text-muted-foreground text-base">
               Aucun consentement enregistre.
             </p>
-          ) : (
+          ) : !loadError ? (
             <div className="flex flex-col gap-3">
-              {consents.map((consent) => {
+              {displayConsents.map((consent) => {
                 const scope =
                   consent.provision?.[0]?.purpose?.[0]?.display ??
                   consent.provision?.[0]?.purpose?.[0]?.code ??
@@ -127,7 +121,7 @@ export function SettingsPage() {
                 );
               })}
             </div>
-          )}
+          ) : null}
         </div>
 
         <Button

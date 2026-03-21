@@ -1,9 +1,12 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from src.agents.mistral_utils import AgentError, AgentTimeoutError
 from src.api.v1.audit_events import router as audit_events_router
 from src.api.v1.compositions import router as compositions_router
 from src.api.v1.consents import router as consents_router
@@ -15,6 +18,9 @@ from src.api.v1.questionnaire_responses import (
 )
 from src.config.settings import settings
 from src.db.engine import engine
+from src.middleware.auth import verify_token
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -27,7 +33,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="Entre Deux API",
     description="FHIR-native AI companion for chronic condition patients",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -39,10 +45,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.exception_handler(AgentTimeoutError)
+async def agent_timeout_handler(
+    request: Request, exc: AgentTimeoutError
+) -> JSONResponse:
+    """Handle AI agent timeout errors."""
+    logger.warning("Agent timeout: %s", exc)
+    return JSONResponse(
+        status_code=504,
+        content={
+            "detail": "Le service d'IA met trop de temps a repondre.",
+            "code": "AI_TIMEOUT",
+        },
+    )
+
+
+@app.exception_handler(AgentError)
+async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse:
+    """Handle AI agent errors."""
+    logger.error("Agent error: %s", exc)
+    return JSONResponse(
+        status_code=502,
+        content={
+            "detail": "Le service d'IA est temporairement indisponible.",
+            "code": "AI_UNAVAILABLE",
+        },
+    )
+
+
 app.include_router(health_router, prefix="/api/v1")
-app.include_router(patients_router, prefix="/api/v1")
-app.include_router(observations_router, prefix="/api/v1")
-app.include_router(questionnaire_responses_router, prefix="/api/v1")
-app.include_router(compositions_router, prefix="/api/v1")
-app.include_router(consents_router, prefix="/api/v1")
-app.include_router(audit_events_router, prefix="/api/v1")
+app.include_router(
+    patients_router, prefix="/api/v1", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    observations_router, prefix="/api/v1", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    questionnaire_responses_router,
+    prefix="/api/v1",
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    compositions_router, prefix="/api/v1", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    consents_router, prefix="/api/v1", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    audit_events_router, prefix="/api/v1", dependencies=[Depends(verify_token)]
+)

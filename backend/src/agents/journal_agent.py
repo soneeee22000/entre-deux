@@ -5,7 +5,10 @@ from mistralai import Mistral
 from mistralai.models import ResponseFormat
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.agents.mistral_utils import safe_chat_complete, safe_json_parse
 from src.services.audit_service import AuditService
+
+AGENT_NAME = "journal_agent"
 
 STRUCTURE_SYSTEM_PROMPT = (
     "Tu es un assistant medical qui structure les entrees "
@@ -52,7 +55,8 @@ class JournalAgent:
         self, transcript: str, patient_ref: str | None = None
     ) -> dict[str, Any]:
         """Extract structured data from a journal transcript."""
-        response = await self._client.chat.complete_async(
+        raw = await safe_chat_complete(
+            self._client,
             model=self.MODEL,
             messages=[
                 {"role": "system", "content": STRUCTURE_SYSTEM_PROMPT},
@@ -60,19 +64,18 @@ class JournalAgent:
             ],
             response_format=ResponseFormat(type="json_object"),
             temperature=0.1,
+            agent_name=f"{AGENT_NAME}.structure",
         )
-
-        raw = response.choices[0].message.content  # type: ignore[union-attr]
-        structured = json.loads(raw)  # type: ignore[arg-type]
+        structured = safe_json_parse(raw, agent_name=f"{AGENT_NAME}.structure")
 
         await self._audit.log_ai_call(
-            agent_name="journal_agent.structure",
+            agent_name=f"{AGENT_NAME}.structure",
             model_version=self.MODEL,
             patient_ref=patient_ref,
             input_text=transcript,
             output_text=raw,
         )
-        return structured  # type: ignore[no-any-return]
+        return structured
 
     async def generate_response(
         self,
@@ -85,7 +88,8 @@ class JournalAgent:
             f"Le patient a dit: {transcript}\n\n"
             f"Donnees structurees: {json.dumps(structured_data, ensure_ascii=False)}"
         )
-        response = await self._client.chat.complete_async(
+        raw = await safe_chat_complete(
+            self._client,
             model=self.MODEL,
             messages=[
                 {"role": "system", "content": RESPONSE_SYSTEM_PROMPT},
@@ -93,14 +97,13 @@ class JournalAgent:
             ],
             response_format=ResponseFormat(type="json_object"),
             temperature=0.5,
+            agent_name=f"{AGENT_NAME}.response",
         )
-
-        raw = response.choices[0].message.content  # type: ignore[union-attr]
-        parsed = json.loads(raw)  # type: ignore[arg-type]
+        parsed = safe_json_parse(raw, agent_name=f"{AGENT_NAME}.response")
         empathetic_response = parsed.get("response", raw)
 
         await self._audit.log_ai_call(
-            agent_name="journal_agent.response",
+            agent_name=f"{AGENT_NAME}.response",
             model_version=self.MODEL,
             patient_ref=patient_ref,
             input_text=transcript,

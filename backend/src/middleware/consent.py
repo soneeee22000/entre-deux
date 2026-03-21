@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Any
 
@@ -15,7 +16,7 @@ def require_consent(scope: str) -> Any:
         request: Request,
         session: AsyncSession = Depends(get_session),  # noqa: B008
     ) -> None:
-        body = await request.json()
+        body = json.loads(await request.body())
         patient_id_raw = body.get("patient_id")
         if patient_id_raw is None:
             raise HTTPException(

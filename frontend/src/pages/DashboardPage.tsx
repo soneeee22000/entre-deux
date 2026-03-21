@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FlaskConical, BookHeart, FileText, Settings } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePatient } from "@/lib/use-patient";
+import { useAsyncData } from "@/lib/use-async-data";
 import { api } from "@/lib/api";
 import { formatDateShort } from "@/lib/utils";
 import {
@@ -59,29 +60,28 @@ const ICON_MAP = {
   composition: FileText,
 } as const;
 
+function handleCardKeyDown(
+  event: React.KeyboardEvent,
+  action: () => void,
+): void {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    action();
+  }
+}
+
 export function DashboardPage() {
   const { patientId, patient } = usePatient();
   const navigate = useNavigate();
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!patientId) return;
-    let cancelled = false;
-    api
-      .getPatientTimeline(patientId)
-      .then((data) => {
-        if (!cancelled) setTimeline(buildTimelineItems(data));
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const {
+    data: timelineData,
+    error,
+    isLoading,
+    retry,
+  } = useAsyncData(() => api.getPatientTimeline(patientId!), [patientId]);
 
+  const timeline = timelineData ? buildTimelineItems(timelineData) : [];
   const firstName = patient ? getPatientFirstName(patient) : "";
   const today = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -111,6 +111,11 @@ export function DashboardPage() {
         <Card
           className="cursor-pointer active:opacity-80 transition-opacity"
           onClick={() => navigate("/analyses")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) =>
+            handleCardKeyDown(event, () => navigate("/analyses"))
+          }
         >
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-secondary/20">
@@ -128,6 +133,11 @@ export function DashboardPage() {
         <Card
           className="cursor-pointer active:opacity-80 transition-opacity"
           onClick={() => navigate("/journal")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) =>
+            handleCardKeyDown(event, () => navigate("/journal"))
+          }
         >
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-accent/20">
@@ -145,6 +155,11 @@ export function DashboardPage() {
         <Card
           className="cursor-pointer active:opacity-80 transition-opacity"
           onClick={() => navigate("/bilan")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) =>
+            handleCardKeyDown(event, () => navigate("/bilan"))
+          }
         >
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-primary/10">
@@ -164,14 +179,16 @@ export function DashboardPage() {
         Activite recente
       </h2>
 
+      {error && <ErrorBanner message={error} onRetry={retry} />}
+
       {isLoading ? (
         <LoadingSpinner />
-      ) : timeline.length === 0 ? (
+      ) : !error && timeline.length === 0 ? (
         <p className="text-muted-foreground text-base py-4">
           Aucune activite pour le moment. Commencez par ecrire dans votre
           journal ou analyser un resultat.
         </p>
-      ) : (
+      ) : !error ? (
         <div className="flex flex-col gap-2">
           {timeline.map((item, index) => {
             const Icon = ICON_MAP[item.type];
@@ -193,7 +210,7 @@ export function DashboardPage() {
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

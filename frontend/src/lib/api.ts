@@ -14,6 +14,7 @@ import type {
 } from "./fhir";
 
 const BASE_URL = "/api/v1";
+const API_TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -28,8 +29,15 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (API_TOKEN) {
+    headers["Authorization"] = `Bearer ${API_TOKEN}`;
+  }
+
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { ...headers, ...(options.headers as Record<string, string>) },
     ...options,
   });
 

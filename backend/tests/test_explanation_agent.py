@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.agents.explanation_agent import ExplanationAgent
-from tests.conftest import mock_mistral_chat_response
 
 
 @pytest.mark.asyncio
@@ -15,16 +14,16 @@ async def test_explain_results_returns_french_text(
     agent = ExplanationAgent("fake-key", mock_session)
 
     explanation = "Votre HbA1c est a 6.5%, ce qui est legerement au-dessus."
-    chat_response = mock_mistral_chat_response(
-        json.dumps({"explanation": explanation})
-    )
 
     with (
-        patch.object(
-            agent._client.chat,
-            "complete_async",
+        patch(
+            "src.agents.explanation_agent.safe_chat_complete",
             new_callable=AsyncMock,
-            return_value=chat_response,
+            return_value=json.dumps({"explanation": explanation}),
+        ),
+        patch(
+            "src.agents.explanation_agent.safe_json_parse",
+            return_value={"explanation": explanation},
         ),
         patch.object(
             agent._audit,

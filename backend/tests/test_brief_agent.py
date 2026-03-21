@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.agents.brief_agent import BriefAgent
-from tests.conftest import mock_mistral_chat_response
 
 
 @pytest.mark.asyncio
@@ -22,14 +21,16 @@ async def test_generate_brief_returns_sections(
             {"title": "Questions suggerees", "text": "Demander ajustement"},
         ]
     }
-    chat_response = mock_mistral_chat_response(json.dumps(brief_data))
 
     with (
-        patch.object(
-            agent._client.chat,
-            "complete_async",
+        patch(
+            "src.agents.brief_agent.safe_chat_complete",
             new_callable=AsyncMock,
-            return_value=chat_response,
+            return_value=json.dumps(brief_data),
+        ),
+        patch(
+            "src.agents.brief_agent.safe_json_parse",
+            return_value=brief_data,
         ),
         patch.object(
             agent._audit,

@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.agents.journal_agent import JournalAgent
-from tests.conftest import mock_mistral_chat_response
 
 
 @pytest.mark.asyncio
@@ -20,14 +19,16 @@ async def test_structure_entry_returns_structured_data(
         "medications_mentioned": ["metformine"],
         "severity": "medium",
     }
-    chat_response = mock_mistral_chat_response(json.dumps(structured))
 
     with (
-        patch.object(
-            agent._client.chat,
-            "complete_async",
+        patch(
+            "src.agents.journal_agent.safe_chat_complete",
             new_callable=AsyncMock,
-            return_value=chat_response,
+            return_value=json.dumps(structured),
+        ),
+        patch(
+            "src.agents.journal_agent.safe_json_parse",
+            return_value=structured,
         ),
         patch.object(
             agent._audit,
@@ -52,16 +53,16 @@ async def test_generate_response_returns_empathetic_text(
     agent = JournalAgent("fake-key", mock_session)
 
     response_text = "Je comprends que tu te sentes fatigue."
-    chat_response = mock_mistral_chat_response(
-        json.dumps({"response": response_text})
-    )
 
     with (
-        patch.object(
-            agent._client.chat,
-            "complete_async",
+        patch(
+            "src.agents.journal_agent.safe_chat_complete",
             new_callable=AsyncMock,
-            return_value=chat_response,
+            return_value=json.dumps({"response": response_text}),
+        ),
+        patch(
+            "src.agents.journal_agent.safe_json_parse",
+            return_value={"response": response_text},
         ),
         patch.object(
             agent._audit,

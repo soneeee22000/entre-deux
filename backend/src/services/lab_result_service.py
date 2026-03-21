@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 
@@ -11,6 +12,8 @@ from src.db.repositories.diagnostic_report_repository import (
 from src.db.repositories.observation_repository import ObservationRepository
 from src.db.tables import DiagnosticReportTable, ObservationTable
 from src.models.fhir_helpers import create_diagnostic_report, create_observation
+
+logger = logging.getLogger(__name__)
 
 
 class LabResultService:
@@ -34,39 +37,45 @@ class LabResultService:
         """OCR an image, create Observations + DiagnosticReport, explain, persist."""
         patient_ref = f"Patient/{patient_id}"
 
-        extracted = await self._ocr.extract_lab_results(image_base64, patient_ref)
+        try:
+            extracted = await self._ocr.extract_lab_results(image_base64, patient_ref)
 
-        obs_rows: list[ObservationTable] = []
-        obs_refs: list[str] = []
-        for item in extracted:
-            fhir_obs = create_observation(
-                patient_ref=patient_ref,
-                loinc_code=item["loinc_code"],
-                loinc_display=item["loinc_display"],
-                value=item["value"],
-                unit=item["unit"],
-                reference_range_low=item.get("reference_range_low"),
-                reference_range_high=item.get("reference_range_high"),
-            )
-            row = ObservationTable(
+            obs_rows: list[ObservationTable] = []
+            obs_refs: list[str] = []
+            for item in extracted:
+                fhir_obs = create_observation(
+                    patient_ref=patient_ref,
+                    loinc_code=item["loinc_code"],
+                    loinc_display=item["loinc_display"],
+                    value=item["value"],
+                    unit=item["unit"],
+                    reference_range_low=item.get("reference_range_low"),
+                    reference_range_high=item.get("reference_range_high"),
+                )
+                row = ObservationTable(
+                    patient_id=patient_id,
+                    loinc_code=item["loinc_code"],
+                    fhir_resource=fhir_obs.model_dump(mode="json"),
+                )
+                created = await self._obs_repo.create(row)
+                created.fhir_resource["id"] = str(created.id)
+                obs_rows.append(created)
+                obs_refs.append(f"Observation/{created.id}")
+
+            fhir_dr = create_diagnostic_report(patient_ref, obs_refs)
+            dr_row = DiagnosticReportTable(
                 patient_id=patient_id,
-                loinc_code=item["loinc_code"],
-                fhir_resource=fhir_obs.model_dump(mode="json"),
+                fhir_resource=fhir_dr.model_dump(mode="json"),
             )
-            created = await self._obs_repo.create(row)
-            created.fhir_resource["id"] = str(created.id)
-            obs_rows.append(created)
-            obs_refs.append(f"Observation/{created.id}")
+            await self._dr_repo.create(dr_row)
 
-        fhir_dr = create_diagnostic_report(patient_ref, obs_refs)
-        dr_row = DiagnosticReportTable(
-            patient_id=patient_id,
-            fhir_resource=fhir_dr.model_dump(mode="json"),
-        )
-        await self._dr_repo.create(dr_row)
-
-        explanation = await self._explanation.explain_results(extracted, patient_ref)
-        await self._session.commit()
+            explanation = await self._explanation.explain_results(
+                extracted, patient_ref
+            )
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            raise
 
         return {
             "diagnostic_report": fhir_dr.model_dump(mode="json"),

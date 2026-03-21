@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BookHeart, Send } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Textarea } from "@/components/ui/Textarea";
@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePatient } from "@/lib/use-patient";
-import { api } from "@/lib/api";
+import { useAsyncData, getErrorMessage } from "@/lib/use-async-data";
+import { api, ApiRequestError } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import {
   getJournalTranscript,
@@ -22,34 +24,22 @@ export function JournalPage() {
   const { patientId } = usePatient();
   const [transcript, setTranscript] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [lastResponse, setLastResponse] =
     useState<FhirQuestionnaireResponse | null>(null);
-  const [entries, setEntries] = useState<FhirQuestionnaireResponse[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  useEffect(() => {
-    if (!patientId) return;
-    let cancelled = false;
-    api
-      .listJournalEntries(patientId)
-      .then((data) => {
-        if (!cancelled) setEntries(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoadingHistory(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const {
+    data: entries,
+    error: loadError,
+    isLoading: isLoadingHistory,
+    retry,
+  } = useAsyncData(() => api.listJournalEntries(patientId!), [patientId]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!patientId || !transcript.trim()) return;
 
-    setError("");
+    setSubmitError("");
     setIsSubmitting(true);
     setLastResponse(null);
 
@@ -59,14 +49,24 @@ export function JournalPage() {
         transcript: transcript.trim(),
       });
       setLastResponse(response);
-      setEntries((prev) => [response, ...prev]);
       setTranscript("");
-    } catch {
-      setError("Quelque chose s'est mal passe. Veuillez reessayer.");
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 502 || err.status === 504)
+      ) {
+        setSubmitError(getErrorMessage(err));
+      } else {
+        setSubmitError(
+          "Impossible d'enregistrer votre entree. Verifiez votre connexion et reessayez.",
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  const displayEntries = entries ?? [];
 
   return (
     <div>
@@ -80,9 +80,9 @@ export function JournalPage() {
             placeholder="Comment vous sentez-vous aujourd'hui ? Decrivez vos symptomes, votre humeur, ce que vous avez mange..."
             disabled={isSubmitting}
           />
-          {error && (
+          {submitError && (
             <p className="text-destructive text-sm" role="alert">
-              {error}
+              {submitError}
             </p>
           )}
           {isSubmitting ? (
@@ -101,21 +101,24 @@ export function JournalPage() {
           <h2 className="text-lg font-semibold font-[var(--font-heading)] mb-3">
             Historique
           </h2>
+
+          {loadError && <ErrorBanner message={loadError} onRetry={retry} />}
+
           {isLoadingHistory ? (
             <LoadingSpinner />
-          ) : entries.length === 0 ? (
+          ) : !loadError && displayEntries.length === 0 ? (
             <EmptyState
               icon={<BookHeart size={40} />}
               title="Aucune entree"
               description="Ecrivez votre premiere entree de journal ci-dessus."
             />
-          ) : (
+          ) : !loadError ? (
             <div className="flex flex-col gap-3">
-              {entries.map((entry) => (
+              {displayEntries.map((entry) => (
                 <JournalEntryCard key={entry.id} entry={entry} />
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

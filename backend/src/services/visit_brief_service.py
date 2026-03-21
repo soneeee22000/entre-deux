@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 
@@ -12,6 +13,8 @@ from src.db.repositories.questionnaire_response_repository import (
 from src.db.tables import CompositionTable
 from src.models.fhir_constants import COMPOSITION_TYPE_VISIT_BRIEF
 from src.models.fhir_helpers import create_composition_visit_brief
+
+logger = logging.getLogger(__name__)
 
 
 class VisitBriefService:
@@ -28,36 +31,40 @@ class VisitBriefService:
         """Gather observations + journal entries, generate a visit brief Composition."""
         patient_ref = f"Patient/{patient_id}"
 
-        obs_rows = await self._obs_repo.list_by_patient(patient_id)
-        qr_rows = await self._qr_repo.list_by_patient(patient_id)
+        try:
+            obs_rows = await self._obs_repo.list_by_patient(patient_id)
+            qr_rows = await self._qr_repo.list_by_patient(patient_id)
 
-        observations = [r.fhir_resource for r in obs_rows]
-        qr_data = [r.fhir_resource for r in qr_rows]
+            observations = [r.fhir_resource for r in obs_rows]
+            qr_data = [r.fhir_resource for r in qr_rows]
 
-        brief_result = await self._agent.generate_brief(
-            observations, qr_data, patient_ref
-        )
+            brief_result = await self._agent.generate_brief(
+                observations, qr_data, patient_ref
+            )
 
-        sections = []
-        for section in brief_result.get("sections", []):
-            sections.append({
-                "title": section["title"],
-                "text": {
-                    "status": "generated",
-                    "div": f"<div>{section['text']}</div>",
-                },
-            })
+            sections = []
+            for section in brief_result.get("sections", []):
+                sections.append({
+                    "title": section["title"],
+                    "text": {
+                        "status": "generated",
+                        "div": f"<div>{section['text']}</div>",
+                    },
+                })
 
-        fhir_comp = create_composition_visit_brief(
-            patient_ref, "Device/entre-deux", sections
-        )
-        row = CompositionTable(
-            patient_id=patient_id,
-            composition_type=COMPOSITION_TYPE_VISIT_BRIEF,
-            fhir_resource=fhir_comp.model_dump(mode="json"),
-        )
-        await self._comp_repo.create(row)
-        await self._session.commit()
+            fhir_comp = create_composition_visit_brief(
+                patient_ref, "Device/entre-deux", sections
+            )
+            row = CompositionTable(
+                patient_id=patient_id,
+                composition_type=COMPOSITION_TYPE_VISIT_BRIEF,
+                fhir_resource=fhir_comp.model_dump(mode="json"),
+            )
+            await self._comp_repo.create(row)
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            raise
 
         return fhir_comp.model_dump(mode="json")
 

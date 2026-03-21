@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 
@@ -9,6 +10,8 @@ from src.db.repositories.questionnaire_response_repository import (
 )
 from src.db.tables import QuestionnaireResponseTable
 from src.models.fhir_helpers import create_questionnaire_response
+
+logger = logging.getLogger(__name__)
 
 
 class JournalService:
@@ -25,45 +28,49 @@ class JournalService:
         """Structure transcript, generate response, persist as QR."""
         patient_ref = f"Patient/{patient_id}"
 
-        structured = await self._agent.structure_entry(transcript, patient_ref)
-        ai_response = await self._agent.generate_response(
-            transcript, structured, patient_ref
-        )
+        try:
+            structured = await self._agent.structure_entry(transcript, patient_ref)
+            ai_response = await self._agent.generate_response(
+                transcript, structured, patient_ref
+            )
 
-        items = [
-            {
-                "linkId": "transcript",
-                "text": "Raw transcript",
-                "answer": [{"valueString": transcript}],
-            },
-            {
-                "linkId": "symptoms",
-                "text": "Symptoms",
-                "answer": [
-                    {"valueString": s} for s in structured.get("symptoms", [])
-                ],
-            },
-            {
-                "linkId": "emotional_state",
-                "text": "Emotional state",
-                "answer": [
-                    {"valueString": structured.get("emotional_state", "")}
-                ],
-            },
-            {
-                "linkId": "ai_response",
-                "text": "AI empathetic response",
-                "answer": [{"valueString": ai_response}],
-            },
-        ]
+            items = [
+                {
+                    "linkId": "transcript",
+                    "text": "Raw transcript",
+                    "answer": [{"valueString": transcript}],
+                },
+                {
+                    "linkId": "symptoms",
+                    "text": "Symptoms",
+                    "answer": [
+                        {"valueString": s} for s in structured.get("symptoms", [])
+                    ],
+                },
+                {
+                    "linkId": "emotional_state",
+                    "text": "Emotional state",
+                    "answer": [
+                        {"valueString": structured.get("emotional_state", "")}
+                    ],
+                },
+                {
+                    "linkId": "ai_response",
+                    "text": "AI empathetic response",
+                    "answer": [{"valueString": ai_response}],
+                },
+            ]
 
-        fhir_qr = create_questionnaire_response(patient_ref, items)
-        row = QuestionnaireResponseTable(
-            patient_id=patient_id,
-            fhir_resource=fhir_qr.model_dump(mode="json"),
-        )
-        await self._repo.create(row)
-        await self._session.commit()
+            fhir_qr = create_questionnaire_response(patient_ref, items)
+            row = QuestionnaireResponseTable(
+                patient_id=patient_id,
+                fhir_resource=fhir_qr.model_dump(mode="json"),
+            )
+            await self._repo.create(row)
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            raise
 
         return fhir_qr.model_dump(mode="json")
 

@@ -96,7 +96,9 @@ describe("SettingsPage", () => {
 
   it("revokes consent on button click", async () => {
     const mockApi = await import("@/lib/api");
-    vi.spyOn(mockApi.api, "listConsents").mockResolvedValue([MOCK_CONSENT]);
+    vi.spyOn(mockApi.api, "listConsents")
+      .mockResolvedValueOnce([MOCK_CONSENT])
+      .mockResolvedValueOnce([{ ...MOCK_CONSENT, status: "inactive" }]);
     vi.spyOn(mockApi.api, "revokeConsent").mockResolvedValue({
       ...MOCK_CONSENT,
       status: "inactive",
@@ -115,9 +117,10 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("logout clears state and navigates to welcome", async () => {
+  it("logout calls confirm and navigates on accept", async () => {
     const mockApi = await import("@/lib/api");
     vi.spyOn(mockApi.api, "listConsents").mockResolvedValue([]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderSettings();
     fireEvent.click(screen.getByText("Se deconnecter"));

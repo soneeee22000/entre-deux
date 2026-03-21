@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { FlaskConical, Camera, Upload } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -6,8 +6,10 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePatient } from "@/lib/use-patient";
-import { api } from "@/lib/api";
+import { useAsyncData, getErrorMessage } from "@/lib/use-async-data";
+import { api, ApiRequestError } from "@/lib/api";
 import { fileToBase64, formatDate } from "@/lib/utils";
 import { getObservationDisplay, type FhirObservation } from "@/lib/fhir";
 
@@ -15,33 +17,21 @@ export function LabResultsPage() {
   const { patientId } = usePatient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [analysisResult, setAnalysisResult] = useState<string>("");
-  const [observations, setObservations] = useState<FhirObservation[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  useEffect(() => {
-    if (!patientId) return;
-    let cancelled = false;
-    api
-      .listObservations(patientId)
-      .then((data) => {
-        if (!cancelled) setObservations(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoadingHistory(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const {
+    data: observations,
+    error: loadError,
+    isLoading: isLoadingHistory,
+    retry,
+  } = useAsyncData(() => api.listObservations(patientId!), [patientId]);
 
   async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !patientId) return;
 
-    setError("");
+    setSubmitError("");
     setIsAnalyzing(true);
     setAnalysisResult("");
 
@@ -56,10 +46,18 @@ export function LabResultsPage() {
         typeof result.explanation === "string" ? result.explanation : "";
       setAnalysisResult(explanation);
 
-      const newObs = await api.listObservations(patientId);
-      setObservations(newObs);
-    } catch {
-      setError("Quelque chose s'est mal passe. Veuillez reessayer.");
+      retry();
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 502 || err.status === 504)
+      ) {
+        setSubmitError(getErrorMessage(err));
+      } else {
+        setSubmitError(
+          "L'analyse de l'image a echoue. Verifiez que la photo est lisible et reessayez.",
+        );
+      }
     } finally {
       setIsAnalyzing(false);
       if (fileInputRef.current) {
@@ -67,6 +65,8 @@ export function LabResultsPage() {
       }
     }
   }
+
+  const displayObservations = observations ?? [];
 
   return (
     <div>
@@ -108,9 +108,9 @@ export function LabResultsPage() {
           </Button>
         </div>
 
-        {error && (
+        {submitError && (
           <p className="text-destructive text-sm" role="alert">
-            {error}
+            {submitError}
           </p>
         )}
 
@@ -134,21 +134,23 @@ export function LabResultsPage() {
             Historique des resultats
           </h2>
 
+          {loadError && <ErrorBanner message={loadError} onRetry={retry} />}
+
           {isLoadingHistory ? (
             <LoadingSpinner />
-          ) : observations.length === 0 ? (
+          ) : !loadError && displayObservations.length === 0 ? (
             <EmptyState
               icon={<FlaskConical size={40} />}
               title="Aucun resultat"
               description="Prenez en photo vos resultats d'analyse ou saisissez-les manuellement."
             />
-          ) : (
+          ) : !loadError ? (
             <div className="flex flex-col gap-2">
-              {observations.map((obs) => (
+              {displayObservations.map((obs) => (
                 <ObservationCard key={obs.id} observation={obs} />
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

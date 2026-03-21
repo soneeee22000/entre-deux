@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FileText } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePatient } from "@/lib/use-patient";
-import { api } from "@/lib/api";
-import { formatDate, formatDateInput } from "@/lib/utils";
+import { useAsyncData, getErrorMessage } from "@/lib/use-async-data";
+import { api, ApiRequestError } from "@/lib/api";
+import { formatDate, formatDateInput, stripHtmlTags } from "@/lib/utils";
 import type { FhirComposition } from "@/lib/fhir";
 
 function defaultPeriodStart(): string {
@@ -17,38 +19,36 @@ function defaultPeriodStart(): string {
   return formatDateInput(date);
 }
 
+function handleCardKeyDown(
+  event: React.KeyboardEvent,
+  action: () => void,
+): void {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    action();
+  }
+}
+
 export function VisitBriefPage() {
   const { patientId } = usePatient();
   const [periodStart, setPeriodStart] = useState(defaultPeriodStart);
   const [periodEnd, setPeriodEnd] = useState(() => formatDateInput(new Date()));
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [lastBrief, setLastBrief] = useState<FhirComposition | null>(null);
-  const [compositions, setCompositions] = useState<FhirComposition[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  useEffect(() => {
-    if (!patientId) return;
-    let cancelled = false;
-    api
-      .listCompositions(patientId)
-      .then((data) => {
-        if (!cancelled) setCompositions(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoadingHistory(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const {
+    data: compositions,
+    error: loadError,
+    isLoading: isLoadingHistory,
+    retry,
+  } = useAsyncData(() => api.listCompositions(patientId!), [patientId]);
 
   async function handleGenerate(event: React.FormEvent) {
     event.preventDefault();
     if (!patientId) return;
 
-    setError("");
+    setSubmitError("");
     setIsGenerating(true);
     setLastBrief(null);
 
@@ -59,13 +59,24 @@ export function VisitBriefPage() {
         period_end: new Date(periodEnd).toISOString(),
       });
       setLastBrief(brief);
-      setCompositions((prev) => [brief, ...prev]);
-    } catch {
-      setError("Quelque chose s'est mal passe. Veuillez reessayer.");
+      retry();
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 502 || err.status === 504)
+      ) {
+        setSubmitError(getErrorMessage(err));
+      } else {
+        setSubmitError(
+          "La generation du bilan a echoue. Reessayez dans quelques instants.",
+        );
+      }
     } finally {
       setIsGenerating(false);
     }
   }
+
+  const displayCompositions = compositions ?? [];
 
   return (
     <div>
@@ -104,9 +115,9 @@ export function VisitBriefPage() {
             </div>
           </div>
 
-          {error && (
+          {submitError && (
             <p className="text-destructive text-sm" role="alert">
-              {error}
+              {submitError}
             </p>
           )}
 
@@ -124,21 +135,23 @@ export function VisitBriefPage() {
             Bilans precedents
           </h2>
 
+          {loadError && <ErrorBanner message={loadError} onRetry={retry} />}
+
           {isLoadingHistory ? (
             <LoadingSpinner />
-          ) : compositions.length === 0 ? (
+          ) : !loadError && displayCompositions.length === 0 ? (
             <EmptyState
               icon={<FileText size={40} />}
               title="Aucun bilan"
               description="Generez votre premier bilan de visite ci-dessus."
             />
-          ) : (
+          ) : !loadError ? (
             <div className="flex flex-col gap-3">
-              {compositions.map((comp) => (
+              {displayCompositions.map((comp) => (
                 <CompositionCard key={comp.id} composition={comp} />
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -159,10 +172,9 @@ function CompositionDetail({ composition }: { composition: FhirComposition }) {
             </h4>
           )}
           {section.text?.div && (
-            <div
-              className="text-base text-foreground prose-sm"
-              dangerouslySetInnerHTML={{ __html: section.text.div }}
-            />
+            <p className="text-base text-foreground whitespace-pre-line">
+              {stripHtmlTags(section.text.div)}
+            </p>
           )}
         </div>
       ))}
@@ -175,7 +187,15 @@ function CompositionCard({ composition }: { composition: FhirComposition }) {
   const date = composition.date ? formatDate(composition.date) : "";
 
   return (
-    <Card className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <Card
+      className="cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) =>
+        handleCardKeyDown(event, () => setExpanded(!expanded))
+      }
+    >
       <div className="flex items-center justify-between">
         <p className="font-medium text-base">
           {composition.title ?? "Bilan de visite"}
@@ -192,10 +212,9 @@ function CompositionCard({ composition }: { composition: FhirComposition }) {
                 </h4>
               )}
               {section.text?.div && (
-                <div
-                  className="text-sm text-foreground"
-                  dangerouslySetInnerHTML={{ __html: section.text.div }}
-                />
+                <p className="text-sm text-foreground whitespace-pre-line">
+                  {stripHtmlTags(section.text.div)}
+                </p>
               )}
             </div>
           ))}

@@ -1,11 +1,13 @@
-import json
 from typing import Any
 
 from mistralai import Mistral
 from mistralai.models import ResponseFormat
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.agents.mistral_utils import safe_chat_complete, safe_json_parse
 from src.services.audit_service import AuditService
+
+AGENT_NAME = "explanation_agent"
 
 EXPLANATION_SYSTEM_PROMPT = (
     "Tu es un assistant medical bienveillant qui explique "
@@ -41,7 +43,8 @@ class ExplanationAgent:
         """Generate a plain-French explanation of lab observations."""
         summary = self._format_observations(observations)
 
-        response = await self._client.chat.complete_async(
+        raw = await safe_chat_complete(
+            self._client,
             model=self.MODEL,
             messages=[
                 {"role": "system", "content": EXPLANATION_SYSTEM_PROMPT},
@@ -55,14 +58,13 @@ class ExplanationAgent:
             ],
             response_format=ResponseFormat(type="json_object"),
             temperature=0.3,
+            agent_name=AGENT_NAME,
         )
-
-        raw = response.choices[0].message.content  # type: ignore[union-attr]
-        parsed = json.loads(raw)  # type: ignore[arg-type]
+        parsed = safe_json_parse(raw, agent_name=AGENT_NAME)
         explanation = parsed.get("explanation", raw)
 
         await self._audit.log_ai_call(
-            agent_name="explanation_agent",
+            agent_name=AGENT_NAME,
             model_version=self.MODEL,
             patient_ref=patient_ref,
             input_text=summary,

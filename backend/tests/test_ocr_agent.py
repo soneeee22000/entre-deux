@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.agents.ocr_agent import OCRAgent, _normalize_results
-from tests.conftest import mock_mistral_chat_response, mock_mistral_ocr_response
+from tests.conftest import mock_mistral_ocr_response
 
 
 @pytest.mark.asyncio
@@ -15,21 +15,17 @@ async def test_extract_lab_results_full_pipeline(
     agent = OCRAgent("fake-key", mock_session)
 
     ocr_response = mock_mistral_ocr_response("HbA1c: 6.5%")
-    chat_response = mock_mistral_chat_response(
-        json.dumps({
-            "results": [
-                {
-                    "test_name": "HbA1c",
-                    "loinc_code": "59261-8",
-                    "loinc_display": "HbA1c",
-                    "value": 6.5,
-                    "unit": "%",
-                    "reference_range_low": 4.0,
-                    "reference_range_high": 5.6,
-                }
-            ]
-        })
-    )
+    parsed_results = [
+        {
+            "test_name": "HbA1c",
+            "loinc_code": "59261-8",
+            "loinc_display": "HbA1c",
+            "value": 6.5,
+            "unit": "%",
+            "reference_range_low": 4.0,
+            "reference_range_high": 5.6,
+        }
+    ]
 
     with (
         patch.object(
@@ -38,11 +34,14 @@ async def test_extract_lab_results_full_pipeline(
             new_callable=AsyncMock,
             return_value=ocr_response,
         ),
-        patch.object(
-            agent._client.chat,
-            "complete_async",
+        patch(
+            "src.agents.ocr_agent.safe_chat_complete",
             new_callable=AsyncMock,
-            return_value=chat_response,
+            return_value=json.dumps({"results": parsed_results}),
+        ),
+        patch(
+            "src.agents.ocr_agent.safe_json_parse",
+            return_value={"results": parsed_results},
         ),
         patch.object(
             agent._audit,
