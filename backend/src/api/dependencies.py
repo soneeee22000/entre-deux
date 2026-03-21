@@ -5,6 +5,7 @@ from src.agents.brief_agent import BriefAgent
 from src.agents.explanation_agent import ExplanationAgent
 from src.agents.journal_agent import JournalAgent
 from src.agents.ocr_agent import OCRAgent
+from src.agents.transcribe_agent import TranscribeAgent
 from src.config.settings import settings
 from src.db.engine import get_session
 from src.services.audit_service import AuditService
@@ -43,6 +44,13 @@ def get_journal_service(
     """Provide a JournalService instance."""
     agent = JournalAgent(settings.mistral_api_key, session)
     return JournalService(agent, session)
+
+
+def get_transcribe_agent(
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> TranscribeAgent:
+    """Provide a TranscribeAgent instance."""
+    return TranscribeAgent(settings.mistral_api_key, session)
 
 
 def get_visit_brief_service(

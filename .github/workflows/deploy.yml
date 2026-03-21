@@ -1,0 +1,70 @@
+name: Deploy to Cloud Run
+
+on:
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-west1
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy backend to Cloud Run
+        run: |
+          gcloud run deploy entre-deux-api \
+            --source=./backend \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-env-vars="APP_ENV=production" \
+            --set-secrets="MISTRAL_API_KEY=MISTRAL_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest,DATABASE_URL_SYNC=DATABASE_URL_SYNC:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest" \
+            --min-instances=1 \
+            --max-instances=4 \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=120
+
+  deploy-frontend:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get backend URL
+        id: backend-url
+        run: |
+          URL=$(gcloud run services describe entre-deux-api --region=${{ env.REGION }} --format='value(status.url)')
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy frontend to Cloud Run
+        run: |
+          gcloud run deploy entre-deux-web \
+            --source=./frontend \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-env-vars="BACKEND_URL=${{ steps.backend-url.outputs.url }}" \
+            --min-instances=1 \
+            --max-instances=4 \
+            --memory=256Mi \
+            --cpu=1

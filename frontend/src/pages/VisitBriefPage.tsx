@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -158,12 +158,60 @@ export function VisitBriefPage() {
   );
 }
 
+function DownloadPdfButton({ compositionDbId }: { compositionDbId?: string }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+
+  async function handleDownload() {
+    if (!compositionDbId) return;
+    setIsDownloading(true);
+    setDownloadError("");
+    try {
+      const blob = await api.downloadCompositionPdf(compositionDbId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bilan-visite-${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Impossible de telecharger le PDF. Reessayez.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  if (!compositionDbId) return null;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Button
+        variant="secondary"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className="text-sm"
+      >
+        <Download size={16} className="mr-1" />
+        {isDownloading ? "Telechargement..." : "Telecharger le PDF"}
+      </Button>
+      {downloadError && (
+        <p className="text-destructive text-xs" role="alert">
+          {downloadError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CompositionDetail({ composition }: { composition: FhirComposition }) {
   return (
     <Card className="border-primary/30">
-      <h3 className="text-lg font-semibold font-[var(--font-heading)] mb-3">
-        {composition.title ?? "Bilan de visite"}
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold font-[var(--font-heading)]">
+          {composition.title ?? "Bilan de visite"}
+        </h3>
+        <DownloadPdfButton compositionDbId={composition._db_id} />
+      </div>
       {composition.section?.map((section, index) => (
         <div key={index} className="mb-4 last:mb-0">
           {section.title && (
@@ -218,6 +266,9 @@ function CompositionCard({ composition }: { composition: FhirComposition }) {
               )}
             </div>
           ))}
+          <div className="mt-3 pt-3 border-t border-border">
+            <DownloadPdfButton compositionDbId={composition._db_id} />
+          </div>
         </div>
       )}
     </Card>

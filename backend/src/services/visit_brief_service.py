@@ -66,11 +66,27 @@ class VisitBriefService:
             await self._session.rollback()
             raise
 
-        return fhir_comp.model_dump(mode="json")
+        result = fhir_comp.model_dump(mode="json")
+        result["_db_id"] = str(row.id)
+        return result
 
     async def list_compositions(
         self, patient_id: uuid.UUID
     ) -> list[dict[str, Any]]:
         """List all compositions for a patient."""
         rows = await self._comp_repo.list_by_patient(patient_id)
-        return [row.fhir_resource for row in rows]
+        results = []
+        for row in rows:
+            resource = dict(row.fhir_resource)
+            resource["_db_id"] = str(row.id)
+            results.append(resource)
+        return results
+
+    async def get_composition_by_id(
+        self, composition_id: uuid.UUID
+    ) -> tuple[dict[str, Any], uuid.UUID] | None:
+        """Get a composition by DB ID, returning (fhir_resource, patient_id)."""
+        row = await self._comp_repo.get_by_id(composition_id)
+        if row is None:
+            return None
+        return row.fhir_resource, row.patient_id

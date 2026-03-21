@@ -136,4 +136,14 @@ describe("JournalPage", () => {
       expect(screen.getByText("Aucune entree")).toBeInTheDocument();
     });
   });
+
+  it("renders microphone button for voice recording", async () => {
+    const mockApi = await import("@/lib/api");
+    vi.spyOn(mockApi.api, "listJournalEntries").mockResolvedValue([]);
+
+    renderJournal();
+
+    const micButton = screen.getByLabelText("Enregistrer un message vocal");
+    expect(micButton).toBeInTheDocument();
+  });
 });

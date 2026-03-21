@@ -10,7 +10,8 @@ Entre Deux is a FHIR-native AI companion for chronic condition patients, filling
 - **Frontend:** React 19, TypeScript (strict), Tailwind CSS, shadcn/ui, PWA (vite-plugin-pwa)
 - **Database:** PostgreSQL 16 (FHIR R5 JSONB via asyncpg)
 - **FHIR:** fhir.resources 8.x (R5) for data model validation
-- **AI Models:** Mistral Small 4, Mistral OCR 3, Voxtral Transcribe
+- **AI Models:** Mistral Small 4, Mistral OCR 3, Voxtral Transcribe (via httpx REST)
+- **PDF:** reportlab (visit brief export)
 - **Auth:** JWT (python-jose) + bcrypt (passlib), per-user rate limiting (slowapi)
 - **Deployment:** Docker, Google Cloud Run
 - **Testing:** pytest (backend), vitest (frontend), Playwright (E2E)
@@ -28,8 +29,8 @@ cd frontend && npm install
 npm run dev
 
 # Tests
-cd backend && pytest -v --cov=src --cov-fail-under=80   # 93 tests
-cd frontend && npm test                                   # 73 unit tests
+cd backend && pytest -v --cov=src --cov-fail-under=80   # 105 tests
+cd frontend && npm test                                   # 83 unit tests
 cd frontend && npm run test:e2e                           # 19 Playwright E2E tests
 
 # Demo seed data
@@ -44,6 +45,7 @@ docker compose up --build
 - Clean Architecture: agents/ (AI logic) → services/ (business logic) → api/ (routes)
 - All clinical data stored as FHIR R5 resources in PostgreSQL JSONB
 - All Mistral API calls go through agents/ via `mistral_utils.safe_chat_complete` — never call Mistral directly
+- Exception: `TranscribeAgent` uses httpx REST call to Mistral audio API (SDK lacks audio support)
 - `mistral_utils` provides `AgentError` / `AgentTimeoutError` exceptions, `safe_chat_complete` with timeout, `safe_json_parse`
 - Every AI agent call is audit-logged as a FHIR AuditEvent
 - All AI-powered endpoints require active FHIR Consent (middleware enforcement)
@@ -90,8 +92,10 @@ RESTful endpoints under /api/v1/:
 - POST /observations — create a single observation
 - GET /observations/patients/{id} — list patient observations
 - POST /questionnaire-responses — create journal entry (rate limited)
+- POST /questionnaire-responses/audio — voice journal: transcribe audio + create entry (multipart, rate limited)
 - GET /questionnaire-responses/patients/{id} — list patient journal entries
 - POST /compositions/visit-brief — generate visit brief (rate limited)
+- GET /compositions/{id}/pdf — download composition as PDF
 - GET /compositions/patients/{id} — list patient compositions
 - POST /consents — record patient consent
 - PUT /consents/{id}/revoke — revoke consent

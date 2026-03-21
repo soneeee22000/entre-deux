@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-TEST_JWT_SECRET = "test-jwt-signing-material"
-
 from src.services.auth_service import AuthService, pwd_context
+
+TEST_JWT_SECRET = "test-jwt-signing-material"
 
 
 @pytest.fixture

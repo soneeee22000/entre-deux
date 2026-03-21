@@ -85,6 +85,7 @@ export interface FhirComposition {
   date?: string;
   title?: string;
   section?: FhirCompositionSection[];
+  _db_id?: string;
 }
 
 export interface FhirConsent {

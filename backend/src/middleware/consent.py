@@ -16,8 +16,7 @@ def require_consent(scope: str) -> Any:
         request: Request,
         session: AsyncSession = Depends(get_session),  # noqa: B008
     ) -> None:
-        body = json.loads(await request.body())
-        patient_id_raw = body.get("patient_id")
+        patient_id_raw = await _extract_patient_id(request)
         if patient_id_raw is None:
             raise HTTPException(
                 status_code=400, detail="patient_id is required"
@@ -38,3 +37,25 @@ def require_consent(scope: str) -> Any:
             )
 
     return Depends(_verify)
+
+
+async def _extract_patient_id(request: Request) -> str | None:
+    """Extract patient_id from JSON body or multipart form data."""
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        value = form.get("patient_id")
+        if value is None:
+            return None
+        return str(value)
+
+    body_bytes = await request.body()
+    if not body_bytes:
+        return None
+    try:
+        body = json.loads(body_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    value = body.get("patient_id")
+    return str(value) if value is not None else None

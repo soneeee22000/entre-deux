@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { MicrophoneButton } from "@/components/ui/MicrophoneButton";
 import { usePatient } from "@/lib/use-patient";
+import { useAudioRecorder } from "@/lib/use-audio-recorder";
 import { useAsyncData, getErrorMessage } from "@/lib/use-async-data";
 import { api, ApiRequestError } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -27,6 +29,15 @@ export function JournalPage() {
   const [submitError, setSubmitError] = useState("");
   const [lastResponse, setLastResponse] =
     useState<FhirQuestionnaireResponse | null>(null);
+
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+    audioBlob,
+    error: audioError,
+    reset: resetAudio,
+  } = useAudioRecorder();
 
   const {
     data: entries,
@@ -66,6 +77,33 @@ export function JournalPage() {
     }
   }
 
+  async function handleSendAudio() {
+    if (!patientId || !audioBlob) return;
+
+    setSubmitError("");
+    setIsSubmitting(true);
+    setLastResponse(null);
+
+    try {
+      const response = await api.createJournalEntryAudio(patientId, audioBlob);
+      setLastResponse(response);
+      resetAudio();
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 502 || err.status === 504)
+      ) {
+        setSubmitError(getErrorMessage(err));
+      } else {
+        setSubmitError(
+          "Impossible de transcrire l'audio. Verifiez votre connexion et reessayez.",
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const displayEntries = entries ?? [];
 
   return (
@@ -78,20 +116,54 @@ export function JournalPage() {
             value={transcript}
             onChange={(event) => setTranscript(event.target.value)}
             placeholder="Comment vous sentez-vous aujourd'hui ? Decrivez vos symptomes, votre humeur, ce que vous avez mange..."
-            disabled={isSubmitting}
+            disabled={isSubmitting || isRecording}
           />
-          {submitError && (
+          {(submitError || audioError) && (
             <p className="text-destructive text-sm" role="alert">
-              {submitError}
+              {submitError || audioError}
             </p>
+          )}
+          {audioBlob && !isSubmitting && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/10 border border-accent/30">
+              <span className="text-sm text-foreground flex-1">
+                Enregistrement pret a envoyer
+              </span>
+              <Button
+                type="button"
+                onClick={handleSendAudio}
+                className="text-sm"
+              >
+                <Send size={16} className="mr-1" />
+                Envoyer l&apos;audio
+              </Button>
+              <button
+                type="button"
+                onClick={resetAudio}
+                className="text-sm text-muted-foreground underline"
+              >
+                Annuler
+              </button>
+            </div>
           )}
           {isSubmitting ? (
             <LoadingSpinner message="Analyse en cours..." />
           ) : (
-            <Button type="submit" disabled={!transcript.trim()}>
-              <Send size={18} className="mr-2" />
-              Envoyer
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                disabled={!transcript.trim() || isRecording}
+                className="flex-1"
+              >
+                <Send size={18} className="mr-2" />
+                Envoyer
+              </Button>
+              <MicrophoneButton
+                isRecording={isRecording}
+                onStart={startRecording}
+                onStop={stopRecording}
+                disabled={isSubmitting}
+              />
+            </div>
           )}
         </form>
 
