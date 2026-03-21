@@ -2,7 +2,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OnboardingPage } from "@/pages/OnboardingPage";
-import { PatientContext } from "@/lib/patient-context-value";
+
+const TEST_PASS = "password123";
 
 vi.mock("@/assets/hero.png", () => ({ default: "hero.png" }));
 
@@ -14,21 +15,21 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-function renderOnboarding() {
-  const contextValue = {
-    patientId: null,
-    patient: null,
+vi.mock("@/lib/use-auth", () => ({
+  useAuth: () => ({
+    isAuthenticated: false,
     isLoading: false,
+    patientId: null,
+    login: vi.fn(),
     register: mockRegister,
-    refresh: vi.fn(),
     logout: vi.fn(),
-  };
+  }),
+}));
 
+function renderOnboarding() {
   return render(
     <MemoryRouter>
-      <PatientContext value={contextValue}>
-        <OnboardingPage />
-      </PatientContext>
+      <OnboardingPage />
     </MemoryRouter>,
   );
 }
@@ -49,36 +50,35 @@ describe("OnboardingPage", () => {
   it("transitions to register step on click", () => {
     renderOnboarding();
     fireEvent.click(screen.getByText("Commencer"));
-    expect(screen.getByText("Creer votre profil")).toBeInTheDocument();
+    expect(screen.getByText("Creer votre compte")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Prenom")).toBeInTheDocument();
   });
 
-  it("renders registration form fields", () => {
+  it("renders registration form fields including email and password", () => {
     renderOnboarding();
     fireEvent.click(screen.getByText("Commencer"));
 
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mot de passe")).toBeInTheDocument();
     expect(screen.getByLabelText("Prenom")).toBeInTheDocument();
     expect(screen.getByLabelText("Nom")).toBeInTheDocument();
     expect(screen.getByLabelText("Identifiant patient")).toBeInTheDocument();
-    expect(screen.getByText("Creer mon profil")).toBeInTheDocument();
+    expect(screen.getByText("Creer mon compte")).toBeInTheDocument();
   });
 
   it("submits form and navigates on success", async () => {
-    const mockApi = await import("@/lib/api");
-    vi.spyOn(mockApi.api, "createPatient").mockResolvedValue({
-      resourceType: "Patient",
-      id: "new-id",
-      name: [{ given: ["Marie"], family: "Dupont" }],
-    });
-    vi.spyOn(mockApi.api, "createConsent").mockResolvedValue({
-      resourceType: "Consent",
-      id: "consent-id",
-      status: "active",
-    });
+    mockRegister.mockResolvedValue(undefined);
 
     renderOnboarding();
     fireEvent.click(screen.getByText("Commencer"));
 
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "marie@exemple.fr" },
+    });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: TEST_PASS },
+    });
     fireEvent.change(screen.getByLabelText("Prenom"), {
       target: { value: "Marie" },
     });
@@ -88,22 +88,34 @@ describe("OnboardingPage", () => {
     fireEvent.change(screen.getByLabelText("Identifiant patient"), {
       target: { value: "TEST-001" },
     });
-    fireEvent.click(screen.getByText("Creer mon profil"));
+    fireEvent.click(screen.getByText("Creer mon compte"));
 
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalled();
+      expect(mockRegister).toHaveBeenCalledWith({
+        email: "marie@exemple.fr",
+        password: TEST_PASS,
+        given_name: "Marie",
+        family_name: "Dupont",
+        identifier: "TEST-001",
+      });
     });
   });
 
   it("shows error on 409 conflict", async () => {
-    const mockApi = await import("@/lib/api");
-    vi.spyOn(mockApi.api, "createPatient").mockRejectedValue(
-      new mockApi.ApiRequestError(409, "CONFLICT", "Already exists"),
+    const { ApiRequestError } = await import("@/lib/api");
+    mockRegister.mockRejectedValue(
+      new ApiRequestError(409, "CONFLICT", "Already exists"),
     );
 
     renderOnboarding();
     fireEvent.click(screen.getByText("Commencer"));
 
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "marie@exemple.fr" },
+    });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: TEST_PASS },
+    });
     fireEvent.change(screen.getByLabelText("Prenom"), {
       target: { value: "Marie" },
     });
@@ -113,11 +125,11 @@ describe("OnboardingPage", () => {
     fireEvent.change(screen.getByLabelText("Identifiant patient"), {
       target: { value: "TEST-001" },
     });
-    fireEvent.click(screen.getByText("Creer mon profil"));
+    fireEvent.click(screen.getByText("Creer mon compte"));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "Cet identifiant est deja utilise.",
+        "Cet email ou identifiant est deja utilise.",
       );
     });
   });
@@ -126,5 +138,10 @@ describe("OnboardingPage", () => {
     renderOnboarding();
     fireEvent.click(screen.getByText("Commencer"));
     expect(screen.getByText("Retour")).toBeInTheDocument();
+  });
+
+  it("has link to login page", () => {
+    renderOnboarding();
+    expect(screen.getByText("Se connecter")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,12 @@
 import type { Page } from "@playwright/test";
 
 const PATIENT_ID = "00000000-0000-0000-0000-000000000001";
+const MOCK_TOKEN_RESPONSE = {
+  access_token: "mock-access-token",
+  refresh_token: "mock-refresh-token",
+  token_type: "bearer",
+  patient_id: PATIENT_ID,
+};
 
 const MOCK_PATIENT = {
   resourceType: "Patient",
@@ -97,6 +103,30 @@ const MOCK_TIMELINE = {
 };
 
 export async function mockAllApiRoutes(page: Page): Promise<void> {
+  await page.route("**/api/v1/auth/register", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ status: 201, json: MOCK_TOKEN_RESPONSE });
+    } else {
+      await route.fallback();
+    }
+  });
+
+  await page.route("**/api/v1/auth/login", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ json: MOCK_TOKEN_RESPONSE });
+    } else {
+      await route.fallback();
+    }
+  });
+
+  await page.route("**/api/v1/auth/refresh", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ json: MOCK_TOKEN_RESPONSE });
+    } else {
+      await route.fallback();
+    }
+  });
+
   await page.route("**/api/v1/patients", async (route) => {
     if (route.request().method() === "POST") {
       await route.fulfill({ status: 201, json: MOCK_PATIENT });
@@ -192,10 +222,23 @@ export async function registerAndNavigateToDashboard(
 
   await page.goto("/bienvenue");
   await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByLabel("Email").fill("marie@exemple.fr");
+  await page.getByLabel("Mot de passe").fill("password123");
   await page.getByLabel("Prenom").fill("Marie");
   await page.getByLabel("Nom", { exact: true }).fill("Laurent");
   await page.getByLabel("Identifiant patient").fill("TEST-001");
-  await page.getByRole("button", { name: "Creer mon profil" }).click();
+  await page.getByRole("button", { name: "Creer mon compte" }).click();
+
+  await page.waitForURL("/");
+}
+
+export async function loginAndNavigateToDashboard(page: Page): Promise<void> {
+  await mockAllApiRoutes(page);
+
+  await page.goto("/connexion");
+  await page.getByLabel("Email").fill("marie@exemple.fr");
+  await page.getByLabel("Mot de passe").fill("password123");
+  await page.getByRole("button", { name: "Se connecter" }).click();
 
   await page.waitForURL("/");
 }

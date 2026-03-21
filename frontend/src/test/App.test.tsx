@@ -7,9 +7,8 @@ describe("App", () => {
     localStorage.clear();
   });
 
-  it("redirects to onboarding when no patient is stored", () => {
+  it("redirects to login when no auth token is stored", () => {
     render(<App />);
-    expect(screen.getByText("Entre Deux")).toBeInTheDocument();
-    expect(screen.getByText("Commencer")).toBeInTheDocument();
+    expect(screen.getByText("Connexion")).toBeInTheDocument();
   });
 });

@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { usePatient } from "@/lib/use-patient";
-import { api, ApiRequestError } from "@/lib/api";
+import { useAuth } from "@/lib/use-auth";
+import { ApiRequestError } from "@/lib/api";
 import heroImage from "@/assets/hero.png";
 
 type Step = "welcome" | "register";
@@ -15,11 +15,13 @@ export function OnboardingPage() {
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
-  const { register } = usePatient();
+  const { register } = useAuth();
 
   async function handleRegister(event: React.FormEvent) {
     event.preventDefault();
@@ -27,22 +29,17 @@ export function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
-      const patient = await api.createPatient({
+      await register({
+        email: email.trim(),
+        password,
         given_name: givenName.trim(),
         family_name: familyName.trim(),
         identifier: identifier.trim(),
       });
-
-      await api.createConsent({
-        patient_id: patient.id,
-        scope: "ai-processing",
-      });
-
-      register(patient);
       navigate("/", { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409) {
-        setError("Cet identifiant est deja utilise.");
+        setError("Cet email ou identifiant est deja utilise.");
       } else {
         setError("Quelque chose s'est mal passe. Veuillez reessayer.");
       }
@@ -73,6 +70,15 @@ export function OnboardingPage() {
             <Heart size={18} className="mr-2" />
             Commencer
           </Button>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Deja un compte ?{" "}
+            <Link
+              to="/connexion"
+              className="text-primary hover:underline font-medium"
+            >
+              Se connecter
+            </Link>
+          </p>
         </div>
       </div>
     );
@@ -82,7 +88,7 @@ export function OnboardingPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold font-[var(--font-heading)] text-foreground mb-2">
-          Creer votre profil
+          Creer votre compte
         </h1>
         <p className="text-base text-muted-foreground mb-8">
           Ces informations restent sur votre appareil et ne sont partagees
@@ -90,6 +96,44 @@ export function OnboardingPage() {
         </p>
 
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Email
+            </label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="marie@exemple.fr"
+              required
+              autoFocus
+              autoComplete="email"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Mot de passe
+            </label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="8 caracteres minimum"
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </div>
+
           <div>
             <label
               htmlFor="givenName"
@@ -103,7 +147,6 @@ export function OnboardingPage() {
               onChange={(event) => setGivenName(event.target.value)}
               placeholder="Marie"
               required
-              autoFocus
             />
           </div>
 
@@ -146,10 +189,10 @@ export function OnboardingPage() {
           )}
 
           {isSubmitting ? (
-            <LoadingSpinner message="Creation du profil..." />
+            <LoadingSpinner message="Creation du compte..." />
           ) : (
             <Button type="submit" className="w-full mt-2">
-              Creer mon profil
+              Creer mon compte
             </Button>
           )}
         </form>

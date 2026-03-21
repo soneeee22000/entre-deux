@@ -14,7 +14,14 @@ import type {
 } from "./fhir";
 
 const BASE_URL = "/api/v1";
-const API_TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
+const AUTH_TOKEN_KEY = "entre-deux-access-token";
+
+interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  patient_id: string;
+}
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -28,18 +35,62 @@ export class ApiRequestError extends Error {
   }
 }
 
+function getToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (API_TOKEN) {
-    headers["Authorization"] = `Bearer ${API_TOKEN}`;
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: { ...headers, ...(options.headers as Record<string, string>) },
     ...options,
   });
+
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem("entre-deux-refresh-token");
+    if (refreshToken) {
+      try {
+        const refreshResponse = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshResponse.ok) {
+          const tokens = (await refreshResponse.json()) as TokenResponse;
+          localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);
+          localStorage.setItem(
+            "entre-deux-refresh-token",
+            tokens.refresh_token,
+          );
+          headers["Authorization"] = `Bearer ${tokens.access_token}`;
+          const retryResponse = await fetch(`${BASE_URL}${path}`, {
+            headers: {
+              ...headers,
+              ...(options.headers as Record<string, string>),
+            },
+            ...options,
+          });
+          if (retryResponse.ok) {
+            return retryResponse.json() as Promise<T>;
+          }
+        }
+      } catch {
+        /* refresh failed, fall through to error */
+      }
+    }
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem("entre-deux-refresh-token");
+    localStorage.removeItem("entre-deux-patient-id");
+    window.location.href = "/connexion";
+    throw new ApiRequestError(401, "UNAUTHORIZED", "Session expiree");
+  }
 
   if (!response.ok) {
     let code = "UNKNOWN";
@@ -58,6 +109,39 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  auth: {
+    register(data: {
+      email: string;
+      password: string;
+      given_name: string;
+      family_name: string;
+      identifier: string;
+    }): Promise<TokenResponse> {
+      return request("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+
+    login(email: string, password: string): Promise<TokenResponse> {
+      return request("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+    },
+
+    refresh(refreshToken: string): Promise<TokenResponse> {
+      return fetch(`${BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }).then((r) => {
+        if (!r.ok) throw new ApiRequestError(r.status, "REFRESH_FAILED", "");
+        return r.json() as Promise<TokenResponse>;
+      });
+    },
+  },
+
   createPatient(data: CreatePatientRequest): Promise<FhirPatient> {
     return request("/patients", {
       method: "POST",

@@ -16,7 +16,9 @@ test.describe("Onboarding Flow", () => {
     await page.goto("/bienvenue");
     await page.getByRole("button", { name: "Commencer" }).click();
 
-    await expect(page.getByText("Creer votre profil")).toBeVisible();
+    await expect(page.getByText("Creer votre compte")).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Mot de passe")).toBeVisible();
     await expect(page.getByLabel("Prenom")).toBeVisible();
     await expect(page.getByLabel("Nom", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Identifiant patient")).toBeVisible();
@@ -27,12 +29,19 @@ test.describe("Onboarding Flow", () => {
     await page.goto("/bienvenue");
 
     await page.getByRole("button", { name: "Commencer" }).click();
+    await page.getByLabel("Email").fill("marie@exemple.fr");
+    await page.getByLabel("Mot de passe").fill("password123");
     await page.getByLabel("Prenom").fill("Marie");
     await page.getByLabel("Nom", { exact: true }).fill("Laurent");
     await page.getByLabel("Identifiant patient").fill("TEST-001");
-    await page.getByRole("button", { name: "Creer mon profil" }).click();
+    await page.getByRole("button", { name: "Creer mon compte" }).click();
 
     await page.waitForURL("/");
     await expect(page.getByText("Bonjour, Marie")).toBeVisible();
+  });
+
+  test("welcome page has link to login", async ({ page }) => {
+    await page.goto("/bienvenue");
+    await expect(page.getByText("Se connecter")).toBeVisible();
   });
 });

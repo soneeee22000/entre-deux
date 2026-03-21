@@ -58,3 +58,35 @@ class CreateConsentRequest(BaseModel):
 
     patient_id: UUID
     scope: str = Field(min_length=1, description="Consent scope (e.g. 'ai-processing')")
+
+
+class RegisterRequest(BaseModel):
+    """Request to register a new user account."""
+
+    email: str = Field(min_length=5)
+    password: str = Field(min_length=8)
+    given_name: str = Field(min_length=1)
+    family_name: str = Field(min_length=1)
+    identifier: str = Field(min_length=1, description="External patient identifier")
+
+
+class LoginRequest(BaseModel):
+    """Request to authenticate."""
+
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class TokenResponse(BaseModel):
+    """JWT token pair response."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    patient_id: str
+
+
+class RefreshRequest(BaseModel):
+    """Request to refresh an access token."""
+
+    refresh_token: str

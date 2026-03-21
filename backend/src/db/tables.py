@@ -7,6 +7,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.db.base import Base
 
 
+class UserTable(Base):
+    """Application user linked 1:1 with a FHIR Patient."""
+
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("patients.id"), unique=True, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 class PatientTable(Base):
     """Patient demographic record storing a FHIR Patient resource."""
 

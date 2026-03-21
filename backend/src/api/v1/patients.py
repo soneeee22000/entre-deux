@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.engine import get_session
 from src.db.repositories.patient_repository import PatientRepository
 from src.db.tables import PatientTable
+from src.middleware.auth import get_current_patient_id, require_patient_match
 from src.models.fhir_helpers import create_patient
 from src.models.schemas import CreatePatientRequest
 
@@ -43,8 +44,10 @@ async def register_patient(
 async def get_patient(
     patient_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),  # noqa: B008
+    current_patient_id: uuid.UUID | None = Depends(get_current_patient_id),  # noqa: B008
 ) -> dict[str, Any]:
     """Get a patient by ID."""
+    require_patient_match(patient_id, current_patient_id)
     repo = PatientRepository(session)
     row = await repo.get_by_id(patient_id)
     if row is None:
@@ -56,8 +59,11 @@ async def get_patient(
 async def get_patient_timeline(
     patient_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),  # noqa: B008
+    current_patient_id: uuid.UUID | None = Depends(get_current_patient_id),  # noqa: B008
 ) -> dict[str, Any]:
     """Get a patient's full timeline of resources."""
+    require_patient_match(patient_id, current_patient_id)
+
     from src.db.repositories.composition_repository import (
         CompositionRepository,
     )

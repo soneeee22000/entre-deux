@@ -17,7 +17,7 @@ async def test_health_check_bypasses_auth() -> None:
     transport = ASGITransport(app=app)
 
     with patch("src.api.v1.health.settings") as mock_settings:
-        setattr(mock_settings, "mistral_api_key", "test-value")
+        mock_settings.mistral_api_key = True
 
         async with AsyncClient(
             transport=transport, base_url="http://test"
@@ -28,12 +28,13 @@ async def test_health_check_bypasses_auth() -> None:
 
 
 @pytest.mark.asyncio
-async def test_valid_token_passes() -> None:
-    """Requests with valid Bearer token should pass auth."""
+async def test_valid_demo_token_passes() -> None:
+    """Requests with valid Bearer demo token should pass auth."""
     transport = ASGITransport(app=app)
 
     with patch("src.middleware.auth.settings") as mock_settings:
         mock_settings.demo_api_token = "test-secret"
+        mock_settings.jwt_secret_key = ""
 
         async with AsyncClient(
             transport=transport, base_url="http://test"
@@ -53,6 +54,7 @@ async def test_missing_token_returns_401() -> None:
 
     with patch("src.middleware.auth.settings") as mock_settings:
         mock_settings.demo_api_token = "test-secret"
+        mock_settings.jwt_secret_key = ""
 
         async with AsyncClient(
             transport=transport, base_url="http://test"
@@ -66,12 +68,13 @@ async def test_missing_token_returns_401() -> None:
 
 
 @pytest.mark.asyncio
-async def test_invalid_token_returns_401() -> None:
-    """Requests with wrong token should return 401."""
+async def test_invalid_demo_token_returns_401() -> None:
+    """Requests with wrong demo token should return 401."""
     transport = ASGITransport(app=app)
 
     with patch("src.middleware.auth.settings") as mock_settings:
         mock_settings.demo_api_token = "test-secret"
+        mock_settings.jwt_secret_key = ""
 
         async with AsyncClient(
             transport=transport, base_url="http://test"
@@ -87,11 +90,12 @@ async def test_invalid_token_returns_401() -> None:
 
 @pytest.mark.asyncio
 async def test_no_token_configured_skips_auth() -> None:
-    """When no demo_api_token is set, auth should be skipped."""
+    """When no demo_api_token or jwt_secret is set, auth should be skipped."""
     transport = ASGITransport(app=app)
 
     with patch("src.middleware.auth.settings") as mock_settings:
         mock_settings.demo_api_token = ""
+        mock_settings.jwt_secret_key = ""
 
         async with AsyncClient(
             transport=transport, base_url="http://test"

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import get_consent_service
 from src.db.engine import get_session
 from src.db.repositories.consent_repository import ConsentRepository
+from src.middleware.auth import get_current_patient_id, require_patient_match
 from src.models.schemas import CreateConsentRequest
 from src.services.consent_service import ConsentService
 
@@ -17,8 +18,10 @@ router = APIRouter(prefix="/consents", tags=["consents"])
 async def create_consent(
     request: CreateConsentRequest,
     service: ConsentService = Depends(get_consent_service),  # noqa: B008
+    current_patient_id: uuid.UUID | None = Depends(get_current_patient_id),  # noqa: B008
 ) -> dict[str, Any]:
     """Record a new patient consent."""
+    require_patient_match(request.patient_id, current_patient_id)
     row = await service.record_consent(request.patient_id, request.scope)
     return row.fhir_resource
 
@@ -39,8 +42,10 @@ async def revoke_consent(
 async def list_patient_consents(
     patient_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),  # noqa: B008
+    current_patient_id: uuid.UUID | None = Depends(get_current_patient_id),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """List all consents for a patient."""
+    require_patient_match(patient_id, current_patient_id)
     repo = ConsentRepository(session)
     rows = await repo.list_by_patient(patient_id)
     return [row.fhir_resource for row in rows]
