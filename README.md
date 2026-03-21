@@ -7,13 +7,15 @@
 _Filling the gap between doctor appointments with consent-first, audit-logged intelligence_
 
 [![CI](https://github.com/soneeee22000/entre-deux/actions/workflows/ci.yml/badge.svg)](https://github.com/soneeee22000/entre-deux/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![FHIR](https://img.shields.io/badge/FHIR-R5-E44D26?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHRleHQgeT0iMjAiIGZvbnQtc2l6ZT0iMjAiPvCfjKU8L3RleHQ+PC9zdmc+)](https://hl7.org/fhir/R5/)
-[![Mistral AI](https://img.shields.io/badge/Mistral_AI-Small_4-FF7000?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHRleHQgeT0iMjAiIGZvbnQtc2l6ZT0iMjAiPvCflKU8L3RleHQ+PC9zdmc+)](https://mistral.ai)
+[![FHIR](https://img.shields.io/badge/FHIR-R5-E44D26)](https://hl7.org/fhir/R5/)
+[![Mistral AI](https://img.shields.io/badge/Mistral_AI-Small_4_+_Voxtral-FF7000)](https://mistral.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**[Live Demo](https://entre-deux-web-102991984200.europe-west1.run.app)** | Login: `sophie@entredeux.demo` / `sophie2024!`
 
 </div>
 
@@ -32,13 +34,13 @@ Patients with chronic conditions see their specialist every **3-6 months**. Betw
 
 ## The Solution
 
-**Entre Deux** is an AI-powered health companion that helps patients **understand**, **remember**, and **prepare** between doctor appointments. Built consent-first on FHIR R5, designed for the French B2B2C healthcare market.
+**Entre Deux** is an AI-powered health companion that helps patients **understand**, **remember**, and **prepare** between doctor appointments. Built consent-first on FHIR R5, powered by Mistral AI, designed for the French B2B2C healthcare market.
 
 ```mermaid
 graph LR
     A["Patient photographs<br/>lab results"] --> B["AI extracts &<br/>explains in French"]
-    C["Patient journals<br/>how they feel"] --> D["AI structures symptoms<br/>& responds with empathy"]
-    B --> E["Visit Brief<br/>for the doctor"]
+    C["Patient journals<br/>(voice or text)"] --> D["AI structures symptoms<br/>& responds with empathy"]
+    B --> E["Visit Brief PDF<br/>for the doctor"]
     D --> E
     E --> F["Prepared<br/>appointment"]
 
@@ -54,21 +56,31 @@ graph LR
 
 ### Lab Result Translator
 
-Patient photographs their blood work. **Mistral OCR** extracts LOINC-coded observations, creates a FHIR DiagnosticReport, and **Mistral Small** explains in plain French:
+Patient photographs their blood work. **Mistral OCR** extracts LOINC-coded observations, creates a FHIR DiagnosticReport, and **Mistral Small** explains in plain French. Results are grouped by test type with trend arrows, color-coded severity, and visual range bars.
 
-> _"Votre HbA1c est passee de 7.2 a 6.8 -- c'est bien, votre glycemie moyenne sur 3 mois s'est amelioree."_
+### Voice & Text Journal
 
-### Health Journal
+Between appointments, patients describe how they feel -- by voice (**Voxtral** transcription) or text. AI structures it into a FHIR QuestionnaireResponse with symptoms, emotional state, severity, and an empathetic response in French.
 
-Between appointments, patients describe how they feel. AI structures it into a FHIR QuestionnaireResponse with symptoms, emotional state, severity, and an empathetic response.
+### Visit Brief with PDF Export
 
-### Visit Brief Generator
+Before the next appointment, AI generates a FHIR Composition with 4 sections: key changes, symptom evolution, lab trends, and suggested questions for the doctor. Downloadable as a formatted PDF.
 
-Before the next appointment, AI generates a FHIR Composition with 4 sections: key changes, symptom evolution, lab trends, and suggested questions for the doctor.
+### Patient-Friendly Analytics
+
+Lab results are presented with traffic-light color coding (green/amber/red), trend arrows showing improvement, horizontal range bars, and plain-language French explanations -- designed for patients with low health literacy.
+
+### JWT Auth + Patient Isolation
+
+Per-user accounts with JWT access/refresh tokens. Patient data is fully isolated -- one patient cannot access another's records.
 
 ### Consent + Audit Trail
 
 Every AI interaction requires explicit patient consent (FHIR Consent). Every AI call is audit-logged (FHIR AuditEvent). Designed for **GDPR**, **HDS**, and **CE marking** compliance.
+
+### PWA with Offline Support
+
+Installable as a Progressive Web App on mobile devices. Service worker caches the app shell for offline access. Standalone display mode.
 
 ---
 
@@ -76,34 +88,40 @@ Every AI interaction requires explicit patient consent (FHIR Consent). Every AI 
 
 ```mermaid
 graph TB
-    subgraph Client["Frontend — React 19 + TypeScript"]
-        UI["Mobile-First SPA<br/>Tailwind CSS"]
+    subgraph Client["Frontend -- React 19 + TypeScript + PWA"]
+        UI["Mobile-First SPA<br/>Tailwind CSS + shadcn/ui"]
     end
 
     subgraph API["FastAPI Backend"]
+        Auth["JWT Auth<br/>+ Patient Isolation"]
         Routes["API Routes<br/>/api/v1/*"]
+        Rate["Rate Limiting<br/>slowapi 5/min AI"]
         Consent["Consent Middleware<br/>FHIR Consent check"]
-        Services["Service Layer<br/>Lab · Journal · Brief · Audit"]
-        Agents["AI Agent Layer"]
+        Services["Service Layer<br/>Lab - Journal - Brief - PDF - Audit"]
+        Agents["AI Agent Layer<br/>OCR - Journal - Brief - Transcribe"]
         Repos["Repository Layer<br/>Generic CRUD + custom queries"]
     end
 
     subgraph AI["Mistral AI"]
-        OCR["Mistral OCR 3<br/>Image → Text"]
+        OCR["Mistral OCR 3<br/>Image to Text"]
         Small["Mistral Small 4<br/>Structured JSON"]
+        Voxtral["Voxtral Mini<br/>Audio Transcription"]
     end
 
-    subgraph DB["PostgreSQL 16"]
-        JSONB["FHIR R5 JSONB<br/>7 tables"]
+    subgraph DB["Cloud SQL PostgreSQL 16"]
+        JSONB["FHIR R5 JSONB<br/>8 tables"]
     end
 
-    UI -->|REST JSON| Routes
-    Routes --> Consent
+    UI -->|REST JSON + Multipart| Routes
+    Routes --> Auth
+    Auth --> Rate
+    Rate --> Consent
     Consent --> Services
     Services --> Agents
     Services --> Repos
     Agents --> OCR
     Agents --> Small
+    Agents --> Voxtral
     Repos --> JSONB
 
     style Client fill:#f5ede3,stroke:#8b6f47,color:#3d2e1f
@@ -112,36 +130,48 @@ graph TB
     style DB fill:#e8f5e9,stroke:#6b8f71,color:#3d2e1f
 ```
 
-### Clean Architecture Layers
+### AI Agent Pipeline
 
 ```mermaid
-graph LR
-    subgraph Presentation
-        R["API Routes"]
-    end
-    subgraph Domain
-        S["Services"]
-        A["Agents"]
-    end
-    subgraph Data
-        RE["Repositories"]
-        T["Tables"]
-    end
+sequenceDiagram
+    participant P as Patient
+    participant API as FastAPI
+    participant Auth as JWT Auth
+    participant CM as Consent<br/>Middleware
+    participant S as Service
+    participant A as AI Agent
+    participant M as Mistral AI
+    participant DB as PostgreSQL
+    participant AU as Audit
 
-    R --> S
-    S --> A
-    S --> RE
-    RE --> T
-
-    style Presentation fill:#d4a574,stroke:#8b6f47,color:#3d2e1f
-    style Domain fill:#8b6f47,stroke:#3d2e1f,color:#fffbf5
-    style Data fill:#6b8f71,stroke:#3d2e1f,color:#fffbf5
+    P->>API: POST /observations/analyze-image
+    API->>Auth: Verify JWT token
+    Auth->>CM: Check active consent
+    CM->>DB: Query ConsentTable
+    DB-->>CM: Consent active
+    CM-->>API: Authorized
+    API->>S: LabResultService.analyze_image()
+    S->>A: OCRAgent.extract_lab_results()
+    A->>M: Mistral OCR 3 (image)
+    M-->>A: Raw text
+    A->>M: Mistral Small 4 (parse to JSON)
+    M-->>A: Structured results
+    A->>AU: Log AuditEvent
+    A-->>S: LOINC-coded observations
+    S->>DB: Save Observations + DiagnosticReport
+    S->>A: ExplanationAgent.explain_results()
+    A->>M: Mistral Small 4 (explain)
+    M-->>A: French explanation
+    A->>AU: Log AuditEvent
+    S-->>API: {observations, report, explanation}
+    API-->>P: 201 Created
 ```
 
 ### FHIR Data Model
 
 ```mermaid
 erDiagram
+    User ||--|| Patient : "1:1 account"
     Patient ||--o{ Observation : "has lab results"
     Patient ||--o{ QuestionnaireResponse : "writes journal"
     Patient ||--o{ Composition : "receives briefs"
@@ -150,6 +180,12 @@ erDiagram
     Observation }o--|| DiagnosticReport : "grouped in"
     AuditEvent }o--o| Patient : "tracks AI calls"
 
+    User {
+        uuid id PK
+        string email UK
+        string password_hash
+        uuid patient_id FK
+    }
     Patient {
         uuid id PK
         string identifier UK
@@ -188,75 +224,56 @@ erDiagram
     }
 ```
 
-### AI Agent Pipeline
-
-```mermaid
-sequenceDiagram
-    participant P as Patient
-    participant API as FastAPI
-    participant CM as Consent<br/>Middleware
-    participant S as Service
-    participant A as AI Agent
-    participant M as Mistral AI
-    participant DB as PostgreSQL
-    participant AU as Audit
-
-    P->>API: POST /observations/analyze-image
-    API->>CM: Check active consent
-    CM->>DB: Query ConsentTable
-    DB-->>CM: Consent active
-    CM-->>API: Authorized
-    API->>S: LabResultService.analyze_image()
-    S->>A: OCRAgent.extract_lab_results()
-    A->>M: Mistral OCR 3 (image)
-    M-->>A: Raw text
-    A->>M: Mistral Small 4 (parse to JSON)
-    M-->>A: Structured results
-    A->>AU: Log AuditEvent
-    A-->>S: LOINC-coded observations
-    S->>DB: Save Observations + DiagnosticReport
-    S->>A: ExplanationAgent.explain_results()
-    A->>M: Mistral Small 4 (explain)
-    M-->>A: French explanation
-    A->>AU: Log AuditEvent
-    S-->>API: {observations, report, explanation}
-    API-->>P: 201 Created
-```
-
 ---
 
 ## Tech Stack
 
-| Layer          | Technology                                    | Purpose                                                       |
-| -------------- | --------------------------------------------- | ------------------------------------------------------------- |
-| **AI**         | Mistral Small 4, Mistral OCR 3                | Structured extraction, empathetic responses, brief generation |
-| **Backend**    | Python 3.10+, FastAPI, SQLAlchemy async       | FHIR-native REST API with dependency injection                |
-| **FHIR**       | fhir.resources 8.x (R5), LOINC                | Clinical data interoperability standard                       |
-| **Frontend**   | React 19, TypeScript (strict), Tailwind CSS 4 | Mobile-first patient interface                                |
-| **Database**   | PostgreSQL 16, JSONB, asyncpg                 | FHIR resources stored as validated JSONB                      |
-| **Migrations** | Alembic                                       | Schema versioning with auto-run on deploy                     |
-| **Testing**    | pytest (61 tests), vitest (56 tests)          | Unit + integration coverage                                   |
-| **CI/CD**      | GitHub Actions, Docker, Google Cloud Run      | Automated lint, type-check, test, build                       |
+| Layer        | Technology                                                  | Purpose                                                          |
+| ------------ | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| **AI**       | Mistral Small 4, Mistral OCR 3, Voxtral Mini                | Structured extraction, empathetic responses, voice transcription |
+| **Backend**  | Python 3.12, FastAPI, SQLAlchemy async, Alembic             | FHIR-native REST API with dependency injection                   |
+| **Auth**     | JWT (python-jose) + bcrypt (passlib), slowapi rate limiting | Per-user auth with patient data isolation                        |
+| **FHIR**     | fhir.resources 8.x (R5), LOINC                              | Clinical data interoperability standard                          |
+| **Frontend** | React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui    | Mobile-first patient PWA interface                               |
+| **Database** | PostgreSQL 16, JSONB, asyncpg                               | FHIR resources stored as validated JSONB                         |
+| **PDF**      | reportlab                                                   | Visit brief PDF generation                                       |
+| **Deploy**   | Docker, Google Cloud Run (europe-west1), Cloud SQL          | Production deployment in Paris region                            |
+| **Testing**  | pytest (105), vitest (83), Playwright (19)                  | 207 total tests across unit, integration, and E2E                |
+| **CI/CD**    | GitHub Actions (4 jobs), Docker Compose                     | Automated lint, mypy strict, test, build, E2E                    |
 
 ---
 
 ## API Endpoints
 
-| Method | Endpoint                                        | Description                     | Auth    |
-| ------ | ----------------------------------------------- | ------------------------------- | ------- |
-| `POST` | `/api/v1/patients`                              | Register a new patient          | --      |
-| `GET`  | `/api/v1/patients/{id}`                         | Get patient by ID               | --      |
-| `GET`  | `/api/v1/patients/{id}/timeline`                | Full patient timeline           | --      |
-| `POST` | `/api/v1/observations/analyze-image`            | OCR lab photo into Observations | Consent |
-| `POST` | `/api/v1/observations`                          | Create manual observation       | --      |
-| `GET`  | `/api/v1/observations/patients/{id}`            | List patient observations       | --      |
-| `POST` | `/api/v1/questionnaire-responses`               | Create journal entry            | Consent |
-| `GET`  | `/api/v1/questionnaire-responses/patients/{id}` | List journal entries            | --      |
-| `POST` | `/api/v1/compositions/visit-brief`              | Generate visit brief            | Consent |
-| `GET`  | `/api/v1/compositions/patients/{id}`            | List compositions               | --      |
-| `POST` | `/api/v1/consents`                              | Record patient consent          | --      |
-| `PUT`  | `/api/v1/consents/{id}/revoke`                  | Revoke consent                  | --      |
-| `GET`  | `/api/v1/audit-events`                          | List audit trail                | --      |
+### Public (no auth)
+
+| Method | Endpoint                | Description            |
+| ------ | ----------------------- | ---------------------- |
+| `GET`  | `/api/v1/health`        | Health check (DB + AI) |
+| `POST` | `/api/v1/auth/register` | Create account         |
+| `POST` | `/api/v1/auth/login`    | Authenticate           |
+| `POST` | `/api/v1/auth/refresh`  | Refresh token pair     |
+
+### Protected (JWT required, patient-isolated)
+
+| Method | Endpoint                                        | Description                               | Rate Limit |
+| ------ | ----------------------------------------------- | ----------------------------------------- | ---------- |
+| `POST` | `/api/v1/patients`                              | Register a new patient                    |            |
+| `GET`  | `/api/v1/patients/{id}`                         | Get patient by ID                         |            |
+| `GET`  | `/api/v1/patients/{id}/timeline`                | Full patient timeline                     |            |
+| `POST` | `/api/v1/observations/analyze-image`            | OCR lab photo into Observations           | 5/min      |
+| `POST` | `/api/v1/observations`                          | Create manual observation                 |            |
+| `GET`  | `/api/v1/observations/patients/{id}`            | List patient observations                 |            |
+| `POST` | `/api/v1/questionnaire-responses`               | Create text journal entry                 | 5/min      |
+| `POST` | `/api/v1/questionnaire-responses/audio`         | Voice journal (transcribe + create entry) | 5/min      |
+| `GET`  | `/api/v1/questionnaire-responses/patients/{id}` | List journal entries                      |            |
+| `POST` | `/api/v1/compositions/visit-brief`              | Generate visit brief                      | 5/min      |
+| `GET`  | `/api/v1/compositions/{id}/pdf`                 | Download visit brief as PDF               |            |
+| `GET`  | `/api/v1/compositions/patients/{id}`            | List compositions                         |            |
+| `POST` | `/api/v1/consents`                              | Record patient consent                    |            |
+| `PUT`  | `/api/v1/consents/{id}/revoke`                  | Revoke consent                            |            |
+| `GET`  | `/api/v1/consents/patients/{id}`                | List patient consents                     |            |
+| `GET`  | `/api/v1/audit-events`                          | List audit trail                          |            |
 
 ---
 
@@ -264,8 +281,8 @@ sequenceDiagram
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 24+
+- Python 3.12+
+- Node.js 22+
 - PostgreSQL 16+ (or Docker)
 - [Mistral AI API key](https://console.mistral.ai/)
 
@@ -278,7 +295,14 @@ cp backend/.env.example backend/.env   # add your MISTRAL_API_KEY
 docker compose up --build               # backend :8000 | frontend :5173 | postgres :5433
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+### Demo Data
+
+```bash
+cd backend && python -m scripts.seed_demo
+# Creates Sophie Martin with 3-month diabetes journey:
+#   10 lab results, 6 journal entries, 2 visit briefs
+#   Login: sophie@entredeux.demo / sophie2024!
+```
 
 ### Manual Setup
 
@@ -286,7 +310,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ```bash
 cd backend
-cp .env.example .env                    # add your MISTRAL_API_KEY
+cp .env.example .env                    # add your MISTRAL_API_KEY + JWT_SECRET_KEY
 pip install -r requirements.txt
 alembic upgrade head                    # run database migrations
 uvicorn src.main:app --reload --port 8000
@@ -303,15 +327,20 @@ npm run dev                             # starts at http://localhost:5173
 ### Testing
 
 ```bash
-# Backend — 61 tests
-cd backend && pytest -v
+# Backend -- 105 tests (ruff + mypy strict + pytest + coverage)
+cd backend
+ruff check src/ tests/
+mypy src/ --ignore-missing-imports --strict
+pytest -v --cov=src --cov-fail-under=80
 
-# Frontend — 56 tests
+# Frontend -- 83 unit tests
 cd frontend && npm test
 
-# Linting
-cd backend && ruff check src/ tests/
-cd frontend && npm run lint
+# E2E -- 19 Playwright tests
+cd frontend && npm run test:e2e
+
+# Docker build
+docker compose build
 ```
 
 ---
@@ -321,39 +350,89 @@ cd frontend && npm run lint
 ```
 entre-deux/
 ├── docker-compose.yml
-├── .github/workflows/ci.yml       # CI: lint + type-check + test + build
+├── .github/workflows/
+│   ├── ci.yml                     # CI: lint + mypy strict + test + build + E2E
+│   └── deploy.yml                 # Cloud Run deploy (manual dispatch)
 │
 ├── backend/
-│   ├── Dockerfile
+│   ├── Dockerfile                 # Python 3.12, non-root, healthcheck
 │   ├── requirements.txt
-│   ├── alembic/                    # Database migrations
+│   ├── alembic/                   # Database migrations
+│   ├── scripts/seed_demo.py       # Sophie Martin demo data seeder
 │   └── src/
-│       ├── main.py                 # FastAPI app + router wiring
-│       ├── config/settings.py      # Pydantic settings from .env
-│       ├── agents/                 # 4 Mistral AI agents
-│       │   ├── ocr_agent.py        #   Image → LOINC-coded observations
-│       │   ├── explanation_agent.py #   Lab values → French explanation
-│       │   ├── journal_agent.py    #   Transcript → structured + empathy
-│       │   └── brief_agent.py      #   Data → visit brief sections
-│       ├── services/               # 5 business logic orchestrators
-│       ├── middleware/consent.py    # Consent enforcement dependency
-│       ├── models/                 # FHIR helpers, constants, Pydantic schemas
-│       ├── db/                     # Engine, base, 7 tables, 8 repositories
-│       └── api/v1/                 # 7 versioned route modules
+│       ├── main.py                # FastAPI app + exception handlers
+│       ├── config/settings.py     # Pydantic settings from .env
+│       ├── agents/                # 5 Mistral AI agents
+│       │   ├── ocr_agent.py       #   Image -> LOINC-coded observations
+│       │   ├── explanation_agent.py #  Lab values -> French explanation
+│       │   ├── journal_agent.py   #   Transcript -> structured + empathy
+│       │   ├── brief_agent.py     #   Data -> visit brief sections
+│       │   └── transcribe_agent.py #  Audio -> text (Voxtral REST)
+│       ├── services/              # 6 business logic orchestrators
+│       │   ├── lab_result_service.py
+│       │   ├── journal_service.py
+│       │   ├── visit_brief_service.py
+│       │   ├── pdf_service.py     #   reportlab PDF generation
+│       │   ├── consent_service.py
+│       │   └── audit_service.py
+│       ├── middleware/
+│       │   ├── auth.py            # JWT verification + patient isolation
+│       │   ├── consent.py         # Consent enforcement (JSON + multipart)
+│       │   └── rate_limit.py      # slowapi 5/min AI, 10/min auth
+│       ├── models/                # FHIR helpers, constants, Pydantic schemas
+│       ├── db/                    # Engine, base, 8 tables, 8 repositories
+│       └── api/v1/               # 8 versioned route modules
 │
 ├── frontend/
-│   ├── Dockerfile + nginx.conf     # Multi-stage build → nginx
+│   ├── Dockerfile                 # Node 22 build + nginx + envsubst proxy
+│   ├── nginx.conf                 # Security headers + gzip + API proxy
+│   ├── e2e/                       # 5 Playwright E2E test suites
 │   └── src/
-│       ├── App.tsx                 # Router: 6 pages
-│       ├── components/             # 9 reusable UI components
-│       ├── pages/                  # Onboarding, Dashboard, Journal,
-│       │                           #   LabResults, VisitBrief, Settings
-│       └── lib/                    # API client, FHIR types, patient context
+│       ├── App.tsx                # Router: 7 pages
+│       ├── components/ui/         # 11 reusable UI components
+│       │   ├── Button, Card, Badge, Input, Textarea
+│       │   ├── PageHeader, LoadingSpinner, EmptyState
+│       │   ├── ErrorBanner, ErrorBoundary
+│       │   └── MicrophoneButton   # Voice recording UI
+│       ├── pages/                 # 7 pages
+│       │   ├── LoginPage          # Email/password auth
+│       │   ├── OnboardingPage     # Registration + consent
+│       │   ├── DashboardPage      # Activity timeline + quick actions
+│       │   ├── LabResultsPage     # Grouped trends + range bars
+│       │   ├── JournalPage        # Voice/text + AI response
+│       │   ├── VisitBriefPage     # Generate + PDF download
+│       │   └── SettingsPage       # Consent management + logout
+│       └── lib/
+│           ├── api.ts             # API client with token refresh
+│           ├── fhir.ts            # FHIR type definitions + helpers
+│           ├── use-audio-recorder.ts  # MediaRecorder hook
+│           ├── use-async-data.ts  # Data fetching hook
+│           └── use-patient.ts     # Patient context
 │
 └── docs/
-    ├── PRD.md                      # Product Requirements Document
-    ├── ARCHITECTURE.md             # Architecture Decision Records
-    └── STRATEGY.md                 # Market strategy & positioning
+    ├── PRD.md                     # Product Requirements Document
+    ├── ARCHITECTURE.md            # Architecture Decision Records
+    └── STRATEGY.md                # Market strategy & positioning
+```
+
+---
+
+## Deployment
+
+Deployed on **Google Cloud Run** in `europe-west1` (Paris).
+
+| Service     | URL                                                        |
+| ----------- | ---------------------------------------------------------- |
+| Frontend    | `https://entre-deux-web-102991984200.europe-west1.run.app` |
+| Backend API | `https://entre-deux-api-102991984200.europe-west1.run.app` |
+
+```bash
+# Deploy manually
+gcloud run deploy entre-deux-api --source=./backend --region=europe-west1
+gcloud run deploy entre-deux-web --source=./frontend --region=europe-west1
+
+# Or use GitHub Actions workflow
+gh workflow run deploy.yml
 ```
 
 ---
@@ -375,12 +454,16 @@ graph TB
         A["FHIR AuditEvent<br/>Every AI call logged"]
         L["LOINC Coding<br/>Standardized lab values"]
         J["JSONB Storage<br/>Full FHIR resources preserved"]
+        JWT["JWT Auth<br/>Patient data isolation"]
+        RL["Rate Limiting<br/>5 req/min per user"]
     end
 
     GDPR --> C
     GDPR --> A
+    GDPR --> JWT
     HDS --> J
     CE --> A
+    CE --> RL
     FHIR --> L
     FHIR --> J
 
@@ -411,5 +494,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 <div align="center">
 
 Built with [Mistral AI](https://mistral.ai) | [FHIR R5](https://hl7.org/fhir/R5/) | [FastAPI](https://fastapi.tiangolo.com) | [React](https://react.dev)
+
+Deployed on [Google Cloud Run](https://cloud.google.com/run) (europe-west1, Paris)
 
 </div>
