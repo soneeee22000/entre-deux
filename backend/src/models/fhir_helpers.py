@@ -134,7 +134,7 @@ def create_composition_visit_brief(
         subject=[{"reference": patient_ref}],  # type: ignore[list-item]
         author=[{"reference": author_ref}],  # type: ignore[list-item]
         date=datetime.now(tz=timezone.utc).isoformat(),  # type: ignore[arg-type]
-        title="Visit Brief",
+        title="Bilan de visite",
         section=sections,  # type: ignore[arg-type]
     )
 

@@ -91,7 +91,7 @@ def sample_composition_fhir(patient_id: uuid.UUID) -> dict[str, Any]:
             ]
         },
         "subject": [{"reference": f"Patient/{patient_id}"}],
-        "title": "Visit Brief",
+        "title": "Bilan de visite",
         "section": [
             {
                 "title": "Changements cles",

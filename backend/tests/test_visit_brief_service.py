@@ -60,7 +60,7 @@ async def test_generate_calls_agent_and_persists(
     mock_brief_agent.generate_brief.assert_called_once()
     mock_session.commit.assert_called_once()
     assert result["resourceType"] == "Composition"
-    assert result["title"] == "Visit Brief"
+    assert result["title"] == "Bilan de visite"
 
 
 @pytest.mark.asyncio

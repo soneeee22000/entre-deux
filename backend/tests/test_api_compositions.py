@@ -84,7 +84,7 @@ async def test_list_compositions(
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["title"] == "Visit Brief"
+    assert data[0]["title"] == "Bilan de visite"
 
 
 @pytest.mark.asyncio

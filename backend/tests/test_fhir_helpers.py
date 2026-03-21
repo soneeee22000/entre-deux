@@ -123,7 +123,7 @@ class TestCreateComposition:
         )
         assert isinstance(comp, Composition)
         assert comp.status == "final"
-        assert comp.title == "Visit Brief"
+        assert comp.title == "Bilan de visite"
         assert len(comp.section) == 1  # type: ignore[arg-type]
 
 
