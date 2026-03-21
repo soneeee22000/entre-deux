@@ -158,13 +158,28 @@ export function LabResultsPage() {
 }
 
 function ObservationCard({ observation }: { observation: FhirObservation }) {
+  const [expanded, setExpanded] = useState(false);
   const display = getObservationDisplay(observation);
   const date = observation.effectiveDateTime
     ? formatDate(observation.effectiveDateTime)
     : "";
+  const range = observation.referenceRange?.[0];
+  const rangeLow = range?.low?.value;
+  const rangeHigh = range?.high?.value;
 
   return (
-    <Card>
+    <Card
+      className="cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-base text-foreground">
@@ -181,6 +196,30 @@ function ObservationCard({ observation }: { observation: FhirObservation }) {
           )}
         </div>
       </div>
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-border flex flex-col gap-1">
+          {(rangeLow !== undefined || rangeHigh !== undefined) && (
+            <p className="text-sm text-muted-foreground">
+              Valeurs de reference :{" "}
+              {rangeLow !== undefined && rangeHigh !== undefined
+                ? `${rangeLow} – ${rangeHigh} ${display.unit}`
+                : rangeHigh !== undefined
+                  ? `< ${rangeHigh} ${display.unit}`
+                  : `> ${rangeLow} ${display.unit}`}
+            </p>
+          )}
+          {display.isOutOfRange && (
+            <p className="text-sm text-destructive">
+              Cette valeur est en dehors des normes de reference.
+            </p>
+          )}
+          {!display.isOutOfRange && (
+            <p className="text-sm text-accent">
+              Cette valeur est dans les normes.
+            </p>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
