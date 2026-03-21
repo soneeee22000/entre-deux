@@ -1,16 +1,12 @@
-import uuid  # noqa: I001
+import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import (  # type: ignore[attr-defined]
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
-)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class Base(DeclarativeBase):  # type: ignore[misc]
+class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
 
     id: Mapped[uuid.UUID] = mapped_column(

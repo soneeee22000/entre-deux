@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column  # type: ignore[attr-defined]
+from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
 
