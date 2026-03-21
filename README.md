@@ -326,20 +326,136 @@ npm run dev                             # starts at http://localhost:5173
 
 ### Testing
 
+**207 tests** across 3 layers, enforced by CI on every push.
+
+```mermaid
+graph LR
+    subgraph CI["GitHub Actions CI Pipeline"]
+        direction TB
+        B["Backend Job"]
+        F["Frontend Job"]
+        E["E2E Job"]
+        D["Docker Job"]
+    end
+
+    B --> B1["ruff check"]
+    B --> B2["mypy --strict"]
+    B --> B3["pytest 105 tests<br/>coverage >= 80%"]
+
+    F --> F1["eslint"]
+    F --> F2["vitest 83 tests"]
+    F --> F3["tsc + vite build"]
+
+    E --> E1["Playwright<br/>19 E2E tests"]
+
+    D --> D1["docker compose<br/>build"]
+
+    style CI fill:#f5ede3,stroke:#8b6f47,color:#3d2e1f
+    style B fill:#8b6f47,stroke:#3d2e1f,color:#fffbf5
+    style F fill:#8b6f47,stroke:#3d2e1f,color:#fffbf5
+    style E fill:#8b6f47,stroke:#3d2e1f,color:#fffbf5
+    style D fill:#8b6f47,stroke:#3d2e1f,color:#fffbf5
+```
+
+```mermaid
+graph TB
+    subgraph Backend["Backend -- 105 pytest tests"]
+        direction LR
+        subgraph Agents["AI Agents (17)"]
+            TA["OCR Agent 4"]
+            TB["Journal Agent 2"]
+            TC["Brief Agent 2"]
+            TD["Explanation Agent 3"]
+            TE["Transcribe Agent 4"]
+            TF["Mistral Utils 8"]
+        end
+        subgraph Services["Services (12)"]
+            SA["Lab Result 3"]
+            SB["Journal 2"]
+            SC["Visit Brief 2"]
+            SD["Consent 5"]
+            SE["Audit 3"]
+            SF["Auth 10"]
+            SG["PDF 4"]
+        end
+        subgraph API["API Endpoints (22)"]
+            AA["Patients 6"]
+            AB["Observations 2"]
+            AC["Compositions 4"]
+            AD["Journal 5"]
+            AE["Consents 4"]
+            AF["Audit Events 2"]
+            AG["Auth Routes 4"]
+            AH["Health 1"]
+        end
+        subgraph Middleware["Middleware (11)"]
+            MA["Auth 5"]
+            MB["Consent 3"]
+            MC["Patient Isolation 3"]
+            ME["Rate Limit 2"]
+        end
+        subgraph Models["Models (10)"]
+            MO["FHIR Helpers 10"]
+        end
+    end
+
+    style Backend fill:#fffbf5,stroke:#8b6f47,color:#3d2e1f
+    style Agents fill:#fff3e0,stroke:#d4a574,color:#3d2e1f
+    style Services fill:#f5ede3,stroke:#8b6f47,color:#3d2e1f
+    style API fill:#e8f5e9,stroke:#6b8f71,color:#3d2e1f
+    style Middleware fill:#fce4ec,stroke:#c44d4d,color:#3d2e1f
+    style Models fill:#e3f2fd,stroke:#8b6f47,color:#3d2e1f
+```
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend -- 83 vitest + 19 Playwright"]
+        direction LR
+        subgraph Unit["Unit Tests (83)"]
+            subgraph Pages["Pages (34)"]
+                PA["Dashboard 6"]
+                PB["Journal 7"]
+                PC["Login 4"]
+                PD["Onboarding 7"]
+                PE["Settings 6"]
+                PF["VisitBrief 3"]
+                PG["App 1"]
+            end
+            subgraph Components["Components (22)"]
+                CA["Button 8"]
+                CB["MicrophoneButton 6"]
+                CC["ErrorBoundary 4"]
+                CD["ErrorBanner 4"]
+                CF["BottomNav 4"]
+            end
+            subgraph Lib["Libraries (23)"]
+                LA["FHIR helpers 14"]
+                LB["API client 6"]
+                LC["useAsyncData 3"]
+            end
+        end
+        subgraph E2E["E2E Playwright (19)"]
+            EA["Dashboard 4"]
+            EB["Journal 4"]
+            EC["Onboarding 5"]
+            ED["Settings 3"]
+            EE["Error Handling 3"]
+        end
+    end
+
+    style Frontend fill:#fffbf5,stroke:#8b6f47,color:#3d2e1f
+    style Unit fill:#f5ede3,stroke:#8b6f47,color:#3d2e1f
+    style E2E fill:#e8f5e9,stroke:#6b8f71,color:#3d2e1f
+    style Pages fill:#fff3e0,stroke:#d4a574,color:#3d2e1f
+    style Components fill:#fce4ec,stroke:#c44d4d,color:#3d2e1f
+    style Lib fill:#e3f2fd,stroke:#8b6f47,color:#3d2e1f
+```
+
 ```bash
-# Backend -- 105 tests (ruff + mypy strict + pytest + coverage)
-cd backend
-ruff check src/ tests/
-mypy src/ --ignore-missing-imports --strict
-pytest -v --cov=src --cov-fail-under=80
-
-# Frontend -- 83 unit tests
-cd frontend && npm test
-
-# E2E -- 19 Playwright tests
+# Run all quality gates locally
+cd backend && ruff check src/ tests/ && mypy src/ --ignore-missing-imports --strict && pytest -v --cov=src --cov-fail-under=80
+cd frontend && npm run lint && npm test && npm run build
 cd frontend && npm run test:e2e
-
-# Docker build
 docker compose build
 ```
 
