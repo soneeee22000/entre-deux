@@ -10,7 +10,7 @@ from src.services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "transcribe_agent"
-TRANSCRIBE_MODEL = "mistral-audio-latest"
+TRANSCRIBE_MODEL = "voxtral-mini-transcribe-2507"
 TRANSCRIBE_URL = "https://api.mistral.ai/v1/audio/transcriptions"
 TRANSCRIBE_TIMEOUT_SECONDS = 60.0
 
